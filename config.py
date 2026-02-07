@@ -24,25 +24,37 @@ IDLE_TIMEOUT = float(os.getenv("IDLE_TIMEOUT", "8"))
 # Default CLI tool
 DEFAULT_CLI = os.getenv("DEFAULT_CLI", "claude")
 
-# CLI tool definitions — persistent interactive mode via PTY
+# CLI tool definitions
+#   extra_flags  : flags appended after `-p <message>`
+#   resume_flag  : flag for session resume (None = not supported)
+#   json_output  : whether the CLI outputs JSON (affects parsing)
 CLI_TOOLS: dict[str, dict] = {
     "claude": {
         "command": "claude",
-        "idle_timeout": IDLE_TIMEOUT,
         "max_timeout": AI_CLI_TIMEOUT,
         "name": "Claude Code",
+        "rules_file": "CLAUDE.md",
+        "extra_flags": ["--output-format", "json", "--dangerously-skip-permissions"],
+        "resume_flag": "--resume",
+        "json_output": True,
     },
     "gemini": {
         "command": "gemini",
-        "idle_timeout": IDLE_TIMEOUT,
         "max_timeout": AI_CLI_TIMEOUT,
         "name": "Gemini CLI",
+        "rules_file": "GEMINI.md",
+        "extra_flags": ["--yolo"],
+        "resume_flag": None,
+        "json_output": False,
     },
     "opencode": {
         "command": "opencode",
-        "idle_timeout": IDLE_TIMEOUT,
         "max_timeout": AI_CLI_TIMEOUT,
         "name": "OpenCode",
+        "rules_file": "AGENTS.md",
+        "extra_flags": [],
+        "resume_flag": None,
+        "json_output": False,
     },
 }
 

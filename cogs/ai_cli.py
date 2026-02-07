@@ -1,3 +1,4 @@
+import os
 import time
 
 import discord
@@ -17,6 +18,7 @@ class AiCli(commands.Cog):
         self.cli_name: str = bot.selected_cli
         self.tool: dict = CLI_TOOLS[self.cli_name]
         self.sessions = SessionManager(self.cli_name, cwd=bot.working_dir)
+        self._folder = os.path.basename(bot.working_dir)
 
     async def cog_unload(self) -> None:
         await self.sessions.cleanup()
@@ -29,9 +31,12 @@ class AiCli(commands.Cog):
     @is_allowed_user()
     async def ask_cmd(self, ctx: commands.Context, *, message: str) -> None:
         """Send a message to the AI CLI."""
+        if self.sessions.is_busy:
+            await ctx.reply("CLI is already processing a request. Use `!session kill` to cancel it.")
+            return
         async with ctx.typing():
             result = await self.sessions.send_message(message)
-        await send_result(ctx, result, prefix=f"**{self.tool['name']}**")
+        await send_result(ctx, result, prefix=f"**{self.tool['name']}** @ `{self._folder}`")
 
     # ------------------------------------------------------------------
     # !session
@@ -46,11 +51,21 @@ class AiCli(commands.Cog):
     @session_group.command(name="new")
     @is_allowed_user()
     async def session_new(self, ctx: commands.Context) -> None:
-        """Start a fresh conversation on the next message."""
+        """Start a fresh conversation (kills running process if any)."""
         await self.sessions.new_session()
         await ctx.reply(
             f"Session reset. Next `!ask` starts a new **{self.tool['name']}** conversation."
         )
+
+    @session_group.command(name="kill", aliases=["stop"])
+    @is_allowed_user()
+    async def session_kill(self, ctx: commands.Context) -> None:
+        """Kill the currently running CLI process."""
+        killed = await self.sessions.kill()
+        if killed:
+            await ctx.reply(f"**{self.tool['name']}** process killed.")
+        else:
+            await ctx.reply("No CLI process is currently running.")
 
     @session_group.command(name="info")
     @is_allowed_user()
@@ -62,9 +77,16 @@ class AiCli(commands.Cog):
         mins, secs = divmod(elapsed, 60)
         has_session = info.get("session_id") is not None
 
+        if info["is_busy"]:
+            status = "Processing..."
+        elif has_session:
+            status = "Active"
+        else:
+            status = "New"
+
         embed = discord.Embed(title="Session Info", color=0x5865F2)
         embed.add_field(name="CLI Tool", value=info["tool_name"], inline=True)
-        embed.add_field(name="Status", value="Active" if has_session else "New", inline=True)
+        embed.add_field(name="Status", value=status, inline=True)
         embed.add_field(name="Messages", value=str(info["message_count"]), inline=True)
         embed.add_field(
             name="Duration",

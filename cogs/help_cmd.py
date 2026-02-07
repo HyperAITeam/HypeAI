@@ -28,8 +28,9 @@ class HelpCmd(commands.Cog):
             name="AI CLI",
             value=(
                 f"`{p}ask <message>` — Send message to {tool_name} (alias: `{p}a`)\n"
-                f"`{p}session new` — Restart CLI process (fresh session)\n"
-                f"`{p}session info` — Show session status"
+                f"`{p}session info` — Show session status (alias: `{p}s`)\n"
+                f"`{p}session new` — Start a fresh conversation\n"
+                f"`{p}session kill` — Kill running CLI process (alias: `{p}s stop`)"
             ),
             inline=False,
         )

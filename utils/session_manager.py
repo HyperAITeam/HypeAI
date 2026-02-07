@@ -14,13 +14,15 @@ log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# SessionManager — runs `claude -p` per message with session continuity
+# SessionManager — runs `cli -p` per message with session continuity
 # ---------------------------------------------------------------------------
 class SessionManager:
     """Sends messages via `cli -p` and maintains conversation via --resume.
 
     Each message spawns a short-lived subprocess.  Conversation history
     is preserved through Claude Code's ``--resume <session_id>`` flag.
+    The currently running subprocess is tracked so it can be killed on
+    demand (``!session kill``) or automatically when the bot shuts down.
     """
 
     def __init__(self, cli_name: str, cwd: str | None = None) -> None:
@@ -32,7 +34,15 @@ class SessionManager:
         self.message_count: int = 0
         self.started_at: float = 0.0
 
+        # Currently running subprocess (None when idle)
+        self._proc: asyncio.subprocess.Process | None = None
+
     # ---- public API -------------------------------------------------------
+
+    @property
+    def is_busy(self) -> bool:
+        """True if a CLI subprocess is currently running."""
+        return self._proc is not None and self._proc.returncode is None
 
     async def send_message(self, message: str) -> str:
         cmd = self._build_command(message)
@@ -49,34 +59,41 @@ class SessionManager:
                     subprocess.CREATE_NEW_PROCESS_GROUP
                 )
 
-            proc = await asyncio.create_subprocess_exec(*cmd, **kwargs)
+            # Use shell=True on Windows so .cmd wrappers (e.g. gemini.cmd) work
+            if sys.platform == "win32":
+                shell_cmd = subprocess.list2cmdline(cmd)
+                self._proc = await asyncio.create_subprocess_shell(shell_cmd, **kwargs)
+            else:
+                self._proc = await asyncio.create_subprocess_exec(*cmd, **kwargs)
 
             timeout = self.tool.get("max_timeout", 300)
             stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                proc.communicate(), timeout=timeout,
+                self._proc.communicate(), timeout=timeout,
             )
         except asyncio.TimeoutError:
             log.warning("[send] Timeout after %ss — killing process", timeout)
-            try:
-                proc.kill()
-            except Exception:
-                pass
+            await self._kill_proc()
             return "[Error] Request timed out."
         except FileNotFoundError:
+            self._proc = None
             return (
                 f"[Error] `{self.cli_name}` is not installed or not in PATH."
             )
         except Exception as exc:
             log.error("[send] Subprocess error: %s", exc, exc_info=True)
+            await self._kill_proc()
             return f"[Error] Failed to run `{self.cli_name}`: {exc}"
+
+        returncode = self._proc.returncode
+        self._proc = None  # process finished
 
         stdout = stdout_bytes.decode("utf-8", errors="replace")
         stderr = stderr_bytes.decode("utf-8", errors="replace")
 
-        if proc.returncode != 0:
+        if returncode != 0:
             err_msg = stderr.strip() or stdout.strip() or "CLI exited with error"
             log.warning(
-                "[send] Non-zero exit (%s): %s", proc.returncode, err_msg[:200],
+                "[send] Non-zero exit (%s): %s", returncode, err_msg[:200],
             )
             return f"[Error] {err_msg}"
 
@@ -95,7 +112,19 @@ class SessionManager:
         )
         return result.strip() or "(no output)"
 
+    async def kill(self) -> bool:
+        """Kill the currently running CLI subprocess.
+
+        Returns True if a process was killed, False if nothing was running.
+        """
+        if not self.is_busy:
+            return False
+        await self._kill_proc()
+        log.info("[session] Killed running CLI process")
+        return True
+
     async def new_session(self) -> None:
+        await self.kill()
         self.session_id = None
         self.message_count = 0
         self.started_at = 0.0
@@ -106,35 +135,50 @@ class SessionManager:
             "cli_name": self.cli_name,
             "tool_name": self.tool["name"],
             "cwd": self.cwd or os.getcwd(),
-            "is_alive": True,
+            "is_busy": self.is_busy,
             "message_count": self.message_count,
             "started_at": self.started_at,
             "session_id": self.session_id,
         }
 
     async def cleanup(self) -> None:
-        log.info("Session cleanup (nothing to stop)")
+        """Kill any running process — called when the bot shuts down."""
+        if self.is_busy:
+            await self._kill_proc()
+            log.info("[cleanup] Killed running CLI process on shutdown")
+        else:
+            log.info("[cleanup] No running process to stop")
 
     # ---- internals --------------------------------------------------------
 
+    async def _kill_proc(self) -> None:
+        """Forcefully kill the tracked subprocess."""
+        proc = self._proc
+        self._proc = None
+        if proc is None:
+            return
+        try:
+            proc.kill()
+            await proc.wait()
+        except Exception:
+            pass
+
     def _build_command(self, message: str) -> list[str]:
-        cmd = [
-            self.tool["command"],
-            "-p", message,
-            "--output-format", "json",
-            "--dangerously-skip-permissions",
-        ]
-        if self.session_id:
-            cmd.extend(["--resume", self.session_id])
+        cmd = [self.tool["command"], "-p", message]
+        cmd.extend(self.tool.get("extra_flags", []))
+        resume_flag = self.tool.get("resume_flag")
+        if self.session_id and resume_flag:
+            cmd.extend([resume_flag, self.session_id])
         return cmd
 
-    @staticmethod
-    def _parse_output(raw: str) -> tuple[str, str | None]:
-        """Extract response text and session_id from JSON output.
+    def _parse_output(self, raw: str) -> tuple[str, str | None]:
+        """Extract response text and optional session_id from CLI output.
 
-        Falls back to returning the raw text if JSON parsing fails
-        (e.g. for non-Claude CLIs that don't support --output-format json).
+        For CLIs with json_output=True (Claude), parse JSON.
+        Otherwise return plain text as-is.
         """
+        if not self.tool.get("json_output"):
+            return raw.strip(), None
         try:
             data = json.loads(raw)
             result = data.get("result", raw)
