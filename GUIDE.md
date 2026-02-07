@@ -7,6 +7,9 @@ Discord 메시지를 통해 내 Windows PC에서 실행 중인 AI CLI 도구(Cla
 [Discord 메시지] → [내 PC의 봇] → [AI CLI 도구에 전달] → [응답을 Discord로 반환]
 ```
 
+**Claude Code**는 Agent SDK를 통해 직접 통신하며, AI가 질문할 때 Discord 버튼/셀렉트 메뉴로 응답할 수 있습니다.
+**Gemini CLI / OpenCode**는 subprocess 방식으로 동작합니다.
+
 ---
 
 ## 목차
@@ -18,10 +21,11 @@ Discord 메시지를 통해 내 Windows PC에서 실행 중인 AI CLI 도구(Cla
 5. [봇 실행](#5-봇-실행)
 6. [명령어 사용법](#6-명령어-사용법)
 7. [세션 관리](#7-세션-관리)
-8. [프로젝트 구조](#8-프로젝트-구조)
-9. [동작 원리](#9-동작-원리)
-10. [보안](#10-보안)
-11. [FAQ / 문제 해결](#11-faq--문제-해결)
+8. [TUI 대화형 응답 (Claude 전용)](#8-tui-대화형-응답-claude-전용)
+9. [프로젝트 구조](#9-프로젝트-구조)
+10. [동작 원리](#10-동작-원리)
+11. [보안](#11-보안)
+12. [FAQ / 문제 해결](#12-faq--문제-해결)
 
 ---
 
@@ -31,7 +35,7 @@ Discord 메시지를 통해 내 Windows PC에서 실행 중인 AI CLI 도구(Cla
 
 | 프로그램 | 확인 명령 | 설치 방법 |
 |----------|-----------|-----------|
-| **Python 3.10+** | `python --version` | https://www.python.org/downloads/ |
+| **Node.js 18+** | `node --version` | https://nodejs.org/ |
 | **AI CLI 도구** (1개 이상) | 아래 참고 | 각 도구 공식 문서 |
 
 ### AI CLI 도구 설치 확인
@@ -62,7 +66,7 @@ opencode --version
 3. 왼쪽 메뉴에서 **Bot** 클릭
 4. **Reset Token** 클릭 → 토큰 복사 (이후 `.env`에 사용)
 
-> ⚠️ 토큰은 비밀번호와 같습니다. 절대 공유하지 마세요!
+> 토큰은 비밀번호와 같습니다. 절대 공유하지 마세요!
 
 ### 2-2. 봇 권한 설정
 
@@ -96,14 +100,15 @@ setup.bat
 ```
 
 자동으로:
-- 의존성 설치 (`pip install`)
+- Node.js 확인
+- 의존성 설치 (`npm install`)
 - `.env` 파일 생성 (토큰, 유저ID 입력)
 
 ### 방법 B: 수동 설치
 
 ```bash
 # 1. 의존성 설치
-pip install -r requirements.txt
+npm install
 
 # 2. .env 파일 생성
 copy .env.example .env
@@ -139,8 +144,8 @@ AI_CLI_TIMEOUT=300
 
 | 변수 | 필수 | 기본값 | 설명 |
 |------|:----:|--------|------|
-| `DISCORD_BOT_TOKEN` | ✅ | — | Discord 봇 토큰 |
-| `ALLOWED_USER_IDS` | ✅ | — | 봇 사용 허가 유저 ID (쉼표 구분) |
+| `DISCORD_BOT_TOKEN` | O | — | Discord 봇 토큰 |
+| `ALLOWED_USER_IDS` | O | — | 봇 사용 허가 유저 ID (쉼표 구분) |
 | `COMMAND_PREFIX` | | `!` | 명령어 접두사 |
 | `COMMAND_TIMEOUT` | | `30` | `!exec` 명령 타임아웃 (초) |
 | `AI_CLI_TIMEOUT` | | `300` | AI CLI 응답 타임아웃 (초) |
@@ -158,7 +163,7 @@ start_bot.bat
 ### 방법 B: 직접 실행
 
 ```bash
-python bot.py
+npx tsx src/bot.ts
 ```
 
 ### 실행 시 설정 화면
@@ -194,7 +199,7 @@ python bot.py
 1. **AI CLI 도구 선택** — 사용할 도구 번호 입력 (기본: 1번 Claude)
 2. **작업 폴더 입력** — AI가 작업할 프로젝트 폴더 경로 입력
 3. **규칙 파일 자동 생성** — 선택한 CLI에 맞는 규칙 파일 생성 (CLAUDE.md / GEMINI.md / AGENTS.md)
-4. **Discord 연결** — 봇이 서버에 접속
+4. **Discord 연결** — 봇이 서버에 접속, 상태에 `Claude Code @ MyProject` 표시
 
 > 규칙 파일은 AI가 해당 폴더 안에서만 작업하도록 제한합니다.
 
@@ -216,10 +221,6 @@ python bot.py
 
 ### AI CLI 명령
 
-| 명령어 | 별칭 | 설명 | 예시 |
-|--------|------|------|------|
-| `!ask <메시지>` | `!a` | AI CLI에 메시지 전달 | `!ask 안녕하세요` |
-
 ```
 !ask 이 프로젝트의 구조를 설명해줘
 !a index.html 파일 만들어줘
@@ -227,21 +228,17 @@ python bot.py
 ```
 
 - 첫 번째 메시지에서 새 대화가 시작됩니다
-- 이후 메시지는 **이전 대화를 이어갑니다** (세션 유지)
+- 이후 메시지는 **이전 대화를 이어갑니다** (세션 유지, Claude 전용)
 - AI가 응답하는 동안 Discord에 "입력 중..." 표시됩니다
-- AI CLI 타임아웃: 기본 5분 (`.env`에서 변경 가능)
+- 응답에 현재 **작업 폴더명**이 함께 표시됩니다 (예: `Claude Code @ MyProject`)
 - AI가 이미 처리 중일 때 `!ask`를 보내면 "이미 처리 중" 안내가 나옵니다
 
 ### CMD 명령 실행
 
-| 명령어 | 별칭 | 설명 | 예시 |
-|--------|------|------|------|
-| `!exec <명령>` | `!run`, `!cmd` | Windows CMD 명령 실행 | `!exec dir` |
-
 ```
 !exec dir
 !exec git status
-!run python --version
+!run node --version
 !cmd ipconfig
 ```
 
@@ -254,13 +251,7 @@ python bot.py
 |--------|------|------|
 | `!status` | `!sysinfo` | PC 시스템 정보 표시 |
 
-표시 정보: OS, CPU 사용률, 메모리, 디스크, 업타임, Python 버전
-
-### 도움말
-
-| 명령어 | 설명 |
-|--------|------|
-| `!help` | 전체 명령어 목록 표시 |
+표시 정보: OS, CPU 사용률, 메모리, 업타임, Node.js 버전
 
 ---
 
@@ -278,22 +269,15 @@ AI와의 대화는 **세션** 단위로 관리됩니다.
 
 ```
 !ask 안녕         ← 새 세션 시작 (session_id 저장)
-!ask 이어서 설명해줘  ← 같은 세션 이어감 (--resume session_id)
+!ask 이어서 설명해줘  ← 같은 세션 이어감 (resume session_id)
 !ask 코드 고쳐줘     ← 같은 세션 이어감
 
-!session new       ← 세션 초기화 (프로세스 종료 + session_id 리셋)
+!session new       ← 세션 초기화 (session_id 리셋)
 
 !ask 새로운 주제     ← 새 세션 시작
 ```
 
-### 프로세스 관리
-
-AI CLI가 응답하는 동안 별도의 프로세스가 실행됩니다:
-
-- **실행 중 확인**: `!session info`에서 상태가 "Processing..."으로 표시
-- **중복 방지**: AI가 처리 중일 때 `!ask`를 보내면 "이미 처리 중" 안내
-- **강제 종료**: `!session kill`로 실행 중인 프로세스를 즉시 종료
-- **자동 정리**: 봇 종료 시 (`Ctrl+C`) 실행 중인 CLI 프로세스도 자동 종료
+> Gemini CLI / OpenCode는 세션 재개를 지원하지 않으므로, 매 `!ask`가 독립된 대화입니다.
 
 ### 세션 상태
 
@@ -305,94 +289,160 @@ AI CLI가 응답하는 동안 별도의 프로세스가 실행됩니다:
 | **Active** | 대화가 진행 중인 세션 (이전 대화 이어가기 가능) |
 | **Processing...** | AI CLI가 현재 응답을 생성하는 중 |
 
-내부적으로:
-- 첫 메시지: `claude -p "메시지" --output-format json`
-- 이후 메시지: `claude -p "메시지" --resume <session_id> --output-format json`
-- `!session new`: 프로세스 종료 + session_id 초기화
-- `!session kill`: 프로세스만 종료 (세션은 유지)
+---
+
+## 8. TUI 대화형 응답 (Claude 전용)
+
+Claude Code를 사용할 때, AI가 사용자에게 질문을 하면 (예: "어떤 방식으로 할까요?")
+Discord에서 **버튼** 또는 **셀렉트 메뉴**로 선택지가 표시됩니다.
+
+### 동작 흐름
+
+```
+!ask 이 프로젝트를 리팩토링해줘
+         │
+         ▼
+   Claude가 질문 생성 (AskUserQuestion)
+         │
+         ▼
+   ┌─────────────────────────────────┐
+   │ Claude asks:                     │
+   │ "어떤 방식으로 리팩토링할까요?"    │
+   │                                 │
+   │ [파일 분리] [함수 추출] [클래스 전환] │  ← Discord 버튼
+   └─────────────────────────────────┘
+         │
+   사용자가 [함수 추출] 클릭
+         │
+         ▼
+   Claude가 함수 추출 방식으로 진행
+         │
+         ▼
+   최종 결과를 Discord에 전송
+```
+
+- 선택지가 **4개 이하**: 버튼으로 표시
+- 선택지가 **5개 이상**: 셀렉트 메뉴(드롭다운)로 표시
+- **60초 타임아웃**: 시간 내에 선택하지 않으면 첫 번째 옵션이 자동 선택됩니다
+- 선택 후 버튼이 비활성화되고 어떤 옵션을 선택했는지 표시됩니다
+
+> Gemini CLI / OpenCode는 이 기능을 지원하지 않습니다 (subprocess 방식).
 
 ---
 
-## 8. 프로젝트 구조
+## 9. 프로젝트 구조
 
 ```
 C:\Osgood\AIDevelop\
-├── bot.py                    # 엔트리포인트 (봇 시작, CLI/폴더 선택, 규칙파일 생성)
-├── config.py                 # 설정 (.env 로딩, CLI 도구 정의, 차단 명령어)
-├── requirements.txt          # Python 의존성
+├── package.json              # Node.js 의존성
+├── tsconfig.json             # TypeScript 설정
 ├── .env.example              # 환경변수 템플릿
 ├── .env                      # 실제 토큰/설정 (git-ignored)
 ├── setup.bat                 # Windows 설치 스크립트
 ├── start_bot.bat             # Windows 실행 스크립트
 ├── .gitignore
 │
-├── cogs/                     # Discord 명령어 모듈
-│   ├── ai_cli.py             # !ask, !session — AI CLI 대화
-│   ├── executor.py           # !exec — CMD 명령 실행
-│   ├── status.py             # !status — 시스템 정보
-│   └── help_cmd.py           # !help — 도움말
-│
-└── utils/                    # 유틸리티
-    ├── session_manager.py    # AI CLI 세션 관리 (-p + --resume)
-    ├── subprocess_runner.py  # 비동기 subprocess 래퍼
-    ├── output_formatter.py   # Discord 출력 포맷 (2000자 제한 처리)
-    └── security.py           # 유저 화이트리스트, 명령어 블랙리스트
+└── src/
+    ├── bot.ts                # 엔트리포인트 (봇 시작, CLI/폴더 선택, 커맨드 디스패치)
+    ├── config.ts             # 설정 (.env 로딩, CLI 도구 정의)
+    ├── types.ts              # 타입 정의 (PrefixCommand, BotClient, ISessionManager)
+    │
+    ├── commands/             # Discord 명령어 모듈
+    │   ├── ask.ts            # !ask — AI CLI에 메시지 전달
+    │   ├── session.ts        # !session — 세션 관리 (info/new/kill)
+    │   ├── exec.ts           # !exec — CMD 명령 실행
+    │   ├── status.ts         # !status — 시스템 정보
+    │   └── help.ts           # !help — 도움말
+    │
+    ├── sessions/             # AI CLI 세션 관리
+    │   ├── types.ts          # ISessionManager 인터페이스
+    │   ├── claude.ts         # Claude Agent SDK 세션 (TUI 대응)
+    │   └── subprocess.ts     # Gemini/OpenCode subprocess 세션
+    │
+    └── utils/                # 유틸리티
+        ├── discordPrompt.ts  # AskUserQuestion → Discord 버튼/셀렉트 메뉴
+        ├── formatter.ts      # Discord 출력 포맷 (2000자 제한 처리)
+        ├── security.ts       # 유저 화이트리스트, 명령어 블랙리스트
+        ├── subprocess.ts     # 비동기 subprocess 래퍼 (!exec 용)
+        └── typing.ts         # 타이핑 인디케이터 헬퍼
 ```
 
 ---
 
-## 9. 동작 원리
+## 10. 동작 원리
 
-### AI CLI 흐름
+### Claude Code 흐름 (Agent SDK)
 
 ```
 유저: !ask 파일 만들어줘
          │
          ▼
-    [cogs/ai_cli.py]
-    Discord 메시지 수신, 권한 확인
-    (이미 처리 중이면 → "이미 처리 중" 안내 후 종료)
+    [commands/ask.ts]
+    권한 확인 + 중복 요청 방지
          │
          ▼
-    [utils/session_manager.py]
-    명령어 생성:
-      claude -p "파일 만들어줘"
-             --output-format json
-             --dangerously-skip-permissions
-             --resume <session_id>
+    [sessions/claude.ts]
+    Agent SDK query() 호출:
+      - prompt: "파일 만들어줘"
+      - cwd: 작업 디렉토리
+      - resume: session_id (있으면)
+      - canUseTool 콜백 등록
          │
          ▼
-    [subprocess 실행 — 프로세스 추적]
-    Claude Code가 작업 수행 → JSON 응답 반환
-    (타임아웃 시 프로세스 자동 종료)
-    (!session kill 시 프로세스 강제 종료)
+    Claude Code가 작업 수행
+         │
+    ┌────┴────┐
+    │         │
+  질문 발생   작업 완료
+    │         │
+    ▼         ▼
+  [canUseTool]  [result message]
+  Discord 버튼   최종 텍스트 추출
+  사용자 선택     session_id 저장
+    │         │
+    └────┬────┘
          │
          ▼
-    [JSON 파싱]
-    { "result": "파일을 생성했습니다...", "session_id": "abc123" }
-         │
-         ▼
-    [utils/output_formatter.py]
+    [utils/formatter.ts]
     2000자 초과 시 → .txt 파일 첨부
+         │
+         ▼
+    Discord에 응답 전송
+    (접두사: Claude Code @ 폴더명)
+```
+
+### Gemini CLI / OpenCode 흐름 (subprocess)
+
+```
+유저: !ask 파일 만들어줘
+         │
+         ▼
+    [commands/ask.ts]
+    권한 확인 + 중복 요청 방지
+         │
+         ▼
+    [sessions/subprocess.ts]
+    명령어 생성:
+      gemini -p "파일 만들어줘" --yolo
+         │
+         ▼
+    [child_process.spawn — shell: true]
+    CLI가 작업 수행 → 텍스트 출력 반환
+    (타임아웃 시 프로세스 자동 종료)
          │
          ▼
     Discord에 응답 전송
 ```
 
-### 프로세스 생명주기
+### CLI별 통신 방식 비교
 
-```
-봇 실행
-  │
-  ├─ !ask → subprocess 생성 (self._proc에 추적)
-  │         ├─ 정상 완료 → _proc = None
-  │         ├─ 타임아웃 → 프로세스 kill → 에러 반환
-  │         └─ !session kill → 프로세스 kill
-  │
-  ├─ !session new → 프로세스 kill + 세션 초기화
-  │
-  └─ 봇 종료 (Ctrl+C) → cog_unload → cleanup() → 프로세스 kill
-```
+| | Claude Code | Gemini CLI | OpenCode |
+|---|---|---|---|
+| **통신** | Agent SDK (`query()`) | subprocess | subprocess |
+| **세션 재개** | O (`resume`) | X | X |
+| **TUI 질문 대응** | O (Discord 버튼) | X | X |
+| **권한 자동 승인** | `bypassPermissions` | `--yolo` 플래그 | — |
+| **출력 형식** | SDK 메시지 스트림 | plain text | plain text |
 
 ### 규칙 파일 자동 생성
 
@@ -404,14 +454,9 @@ C:\Osgood\AIDevelop\
 | Gemini CLI | `GEMINI.md` | Gemini CLI가 읽는 프로젝트 규칙 |
 | OpenCode | `AGENTS.md` | OpenCode가 읽는 프로젝트 규칙 |
 
-규칙 내용:
-- AI가 해당 폴더 안에서만 파일 작업
-- 쉘 명령도 해당 폴더 내에서만 실행
-- 웹 검색은 허용
-
 ---
 
-## 10. 보안
+## 11. 보안
 
 ### 3단계 보안 구조
 
@@ -423,7 +468,7 @@ C:\Osgood\AIDevelop\
        └─ format, diskpart, shutdown 등 위험 명령 차단
 
 [3층] AI 작업 디렉토리 제한
-       └─ CLAUDE.md 규칙으로 지정 폴더 내에서만 작업
+       └─ 규칙 파일(CLAUDE.md 등)으로 지정 폴더 내에서만 작업
 ```
 
 ### 차단되는 CMD 명령어
@@ -437,18 +482,17 @@ reg delete, bcdedit, cipher /w,
 net user, net localgroup
 ```
 
-### `--dangerously-skip-permissions` 플래그
+### 권한 자동 승인
 
-AI CLI 도구가 파일 생성/수정 시 TUI에서 권한을 요청하는데,
-Discord에서는 TUI를 볼 수 없으므로 이 플래그로 자동 승인합니다.
-
-- **범위**: 해당 subprocess 실행 동안만 유효
-- **보안**: Discord 유저 화이트리스트 + 규칙 파일로 보완
-- **OS 권한**: Windows 사용자 계정 권한을 넘지 않음
+| CLI | 방식 | 설명 |
+|-----|------|------|
+| Claude Code | Agent SDK `bypassPermissions` | SDK 레벨에서 모든 도구 사용 자동 승인 |
+| Gemini CLI | `--yolo` 플래그 | 모든 도구 호출 자동 승인 |
+| OpenCode | — | 추가 플래그 없음 |
 
 ---
 
-## 11. FAQ / 문제 해결
+## 12. FAQ / 문제 해결
 
 ### Q: 봇이 응답하지 않아요
 - `.env`의 `DISCORD_BOT_TOKEN`이 올바른지 확인
@@ -459,6 +503,7 @@ Discord에서는 TUI를 볼 수 없으므로 이 플래그로 자동 승인합�
 - 선택한 AI CLI 도구가 설치되어 있는지 확인
   ```bash
   claude --version
+  gemini --version
   ```
 - 설치 후 새 CMD 창에서 봇을 실행해야 PATH가 적용됩니다
 
@@ -477,9 +522,13 @@ Discord에서는 TUI를 볼 수 없으므로 이 플래그로 자동 승인합�
 - `!session new` 명령으로 세션을 초기화하세요
 - 다음 `!ask` 메시지부터 새 대화가 시작됩니다
 
-### Q: 여러 사용자가 동시에 사용할 수 있나요?
-- 현재 1개의 세션만 지원합니다 (모든 유저가 같은 대화를 공유)
-- 여러 유저의 메시지가 같은 AI 대화에 섞일 수 있습니다
+### Q: Claude가 질문했는데 버튼이 안 보여요
+- Claude Code를 사용할 때만 TUI 대화형 응답이 지원됩니다
+- Gemini CLI / OpenCode에서는 AI가 자체적으로 판단하여 진행합니다
+
+### Q: Claude 질문에 응답 안 하면 어떻게 되나요?
+- 60초 타임아웃 후 첫 번째 옵션이 자동 선택되고 "(timeout)" 표시됩니다
+- Claude는 자동 선택된 옵션을 기반으로 계속 진행합니다
 
 ### Q: AI가 너무 오래 걸려요. 중간에 취소할 수 있나요?
 - `!session kill` (또는 `!s stop`)로 실행 중인 프로세스를 즉시 종료할 수 있습니다
@@ -491,3 +540,7 @@ Discord에서는 TUI를 볼 수 없으므로 이 플래그로 자동 승인합�
 ### Q: 봇을 종료하려면?
 - CMD 창에서 `Ctrl+C`를 누르세요
 - 실행 중인 AI CLI 프로세스가 있으면 자동으로 정리됩니다
+
+### Q: 여러 사용자가 동시에 사용할 수 있나요?
+- 현재 1개의 세션만 지원합니다 (모든 유저가 같은 대화를 공유)
+- 여러 유저의 메시지가 같은 AI 대화에 섞일 수 있습니다

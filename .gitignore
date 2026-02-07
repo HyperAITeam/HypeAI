@@ -8,3 +8,5 @@ dist/
 build/
 .venv/
 venv/
+node_modules/
+Test/

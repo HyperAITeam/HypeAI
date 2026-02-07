@@ -8,6 +8,11 @@ if not exist .env (
     exit /b 1
 )
 
+if not exist node_modules (
+    echo node_modules not found. Running npm install...
+    npm install
+)
+
 echo.
-python bot.py
+npx tsx src/bot.ts
 pause

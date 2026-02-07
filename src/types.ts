@@ -1,0 +1,60 @@
+import { Client, Collection, Message, TextBasedChannel } from "discord.js";
+
+// --- Command system (discord.py Cog 대응) ---
+
+export interface CommandContext {
+  message: Message;
+  args: string[];
+  client: BotClient;
+}
+
+export interface PrefixCommand {
+  name: string;
+  aliases?: string[];
+  description: string;
+  execute: (ctx: CommandContext) => Promise<void>;
+}
+
+// --- Bot client (커스텀 속성 확장) ---
+
+export interface BotClient extends Client {
+  commands: Collection<string, PrefixCommand>;
+  aliases: Collection<string, string>;
+  selectedCli: string;
+  workingDir: string;
+}
+
+// --- CLI tool config ---
+
+export interface CliTool {
+  command: string;
+  maxTimeout: number;
+  name: string;
+  rulesFile: string;
+  extraFlags: string[];
+  resumeFlag: string | null;
+  jsonOutput: boolean;
+  /** true = use Agent SDK instead of subprocess */
+  useAgentSdk: boolean;
+}
+
+// --- Session manager interface ---
+
+export interface SessionInfo {
+  cliName: string;
+  toolName: string;
+  cwd: string;
+  isBusy: boolean;
+  messageCount: number;
+  startedAt: number;
+  sessionId: string | null;
+}
+
+export interface ISessionManager {
+  readonly isBusy: boolean;
+  sendMessage(message: string, discordMessage: Message): Promise<string>;
+  kill(): Promise<boolean>;
+  newSession(): Promise<void>;
+  getInfo(): SessionInfo;
+  cleanup(): Promise<void>;
+}
