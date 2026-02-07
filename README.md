@@ -203,3 +203,7 @@ dist/
 | `is not installed or not in PATH` | 해당 CLI 도구가 설치되어 있는지 확인 |
 | 봇이 아무 반응 없음 | Discord Developer Portal에서 **Message Content Intent** 활성화했는지 확인 |
 | 응답이 너무 길어서 잘림 | 2000자 초과 시 자동으로 `.txt` 파일로 첨부됨 |
+
+## License
+
+[MIT](LICENSE)
