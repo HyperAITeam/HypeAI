@@ -826,6 +826,41 @@ dist/
 └── .env.example         # 설정 템플릿
 ```
 
+### GitHub Actions 자동 릴리스
+
+`v*` 태그를 push하면 GitHub Actions가 자동으로 빌드 → Release 생성 → exe 업로드를 수행한다.
+
+#### 워크플로우 (`/.github/workflows/release.yml`)
+
+```
+git tag v1.0.0 → git push origin v1.0.0
+    │
+    ▼
+GitHub Actions (ubuntu-latest)
+    ├─ oven-sh/setup-bun@v2
+    ├─ bun install
+    ├─ bun build --compile --target bun-windows-x64
+    │   └─ Linux에서 Windows exe 크로스 컴파일
+    └─ softprops/action-gh-release@v2
+        └─ Release 생성 + aidevelop-bot.exe, .env.example 업로드
+```
+
+- **러너**: `ubuntu-latest` — Bun의 `--target bun-windows-x64`로 Linux에서 Windows exe 크로스 컴파일 가능
+- **트리거**: `v*` 패턴의 태그 push (예: `v1.0.0`, `v2.1.0-beta`)
+- **권한**: `permissions: contents: write` — Release 생성에 필요
+
+#### 릴리스 생성 방법
+
+```bash
+# 1. 태그 생성
+git tag v1.0.0
+
+# 2. 태그 push → GitHub Actions 자동 실행
+git push origin v1.0.0
+```
+
+GitHub Actions 탭에서 빌드 진행 상황을 확인할 수 있으며, 완료 후 Releases 페이지에서 exe를 다운로드할 수 있다.
+
 ---
 
 ## 20. 주의사항 & 패턴

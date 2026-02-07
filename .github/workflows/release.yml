@@ -1,0 +1,44 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build Windows executable
+        run: bun build src/bot.ts --compile --outfile dist/aidevelop-bot.exe --target bun-windows-x64
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/aidevelop-bot.exe
+            .env.example
+          body: |
+            ## ${{ github.ref_name }}
+
+            ### 다운로드 및 실행
+            1. `aidevelop-bot.exe`와 `.env.example` 다운로드
+            2. `.env.example`을 `.env`로 복사 후 토큰/ID 입력
+            3. `aidevelop-bot.exe` 실행
+          draft: false
+          prerelease: false

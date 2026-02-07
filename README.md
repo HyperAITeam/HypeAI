@@ -17,7 +17,9 @@ Discord 메시지로 PC에 설치된 AI CLI 도구(Claude Code, Gemini CLI, Open
 
 빌드된 `.exe` 파일을 사용하면 Node.js 설치 없이 바로 실행할 수 있습니다.
 
-1. `dist/` 폴더를 원하는 PC에 복사
+[GitHub Releases](../../releases/latest) 페이지에서 최신 버전을 다운로드하세요:
+
+1. `aidevelop-bot.exe`와 `.env.example` 다운로드
 2. `.env.example`을 `.env`로 복사 후 값 입력
 3. `aidevelop-bot.exe` 실행
 
