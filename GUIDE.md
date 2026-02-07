@@ -544,3 +544,353 @@ net user, net localgroup
 ### Q: 여러 사용자가 동시에 사용할 수 있나요?
 - 현재 1개의 세션만 지원합니다 (모든 유저가 같은 대화를 공유)
 - 여러 유저의 메시지가 같은 AI 대화에 섞일 수 있습니다
+
+---
+
+# 개발자 가이드
+
+이 섹션부터는 코드를 수정하거나 확장하려는 개발자를 위한 내용입니다.
+
+---
+
+## 13. 핵심 인터페이스
+
+### PrefixCommand — 커맨드 정의
+
+```typescript
+interface PrefixCommand {
+  name: string;           // "ask"
+  aliases?: string[];     // ["a"]
+  description: string;    // 도움말에 표시
+  execute: (ctx: CommandContext) => Promise<void>;
+}
+```
+
+모든 커맨드 파일은 `PrefixCommand`를 `default export` 한다.
+
+### BotClient — 확장된 Discord Client
+
+```typescript
+interface BotClient extends Client {
+  commands: Collection<string, PrefixCommand>;
+  aliases: Collection<string, string>;   // alias → command name 매핑
+  selectedCli: string;                   // "claude" | "gemini" | "opencode"
+  workingDir: string;                    // AI가 작업할 디렉토리 경로
+}
+```
+
+### CliTool — CLI 도구 설정
+
+```typescript
+interface CliTool {
+  command: string;          // 실행할 CLI 명령어명
+  maxTimeout: number;       // 최대 실행 시간 (초)
+  name: string;             // 표시 이름
+  rulesFile: string;        // 규칙 파일명 (CLAUDE.md 등)
+  extraFlags: string[];     // 추가 CLI 플래그
+  resumeFlag: string | null; // 세션 재개 플래그 (Claude만 "--resume")
+  jsonOutput: boolean;      // JSON 출력 파싱 여부
+  useAgentSdk: boolean;     // true=Agent SDK, false=subprocess
+}
+```
+
+### ISessionManager — 세션 관리 인터페이스
+
+```typescript
+interface ISessionManager {
+  readonly isBusy: boolean;
+  sendMessage(message: string, discordMessage: Message): Promise<string>;
+  kill(): Promise<boolean>;
+  newSession(): Promise<void>;
+  getInfo(): SessionInfo;
+  cleanup(): Promise<void>;
+}
+```
+
+`bot.ts`의 `createSession()`이 `useAgentSdk` 값에 따라 `ClaudeSessionManager` 또는 `SubprocessSessionManager`를 반환한다.
+
+---
+
+## 14. 세션 내부 구조
+
+### ClaudeSessionManager (Agent SDK)
+
+`@anthropic-ai/claude-agent-sdk`의 async generator를 통해 통신한다.
+
+```
+sendMessage(prompt)
+ ├─ AbortController 생성 (취소용)
+ ├─ query(prompt, { resume: sessionId, canUseTool })
+ │   ├─ canUseTool 콜백에서 AskUserQuestion 감지
+ │   │   └─ handleAskUserQuestion() → Discord 버튼/셀렉트
+ │   └─ 나머지 도구는 기본 허용
+ ├─ 응답에서 session_id 추출 → 저장 (다음 호출 시 resume에 전달)
+ └─ result 텍스트 반환
+```
+
+- **세션 유지**: `sessionId`를 저장 → 다음 `query()` 호출 시 `resume` 옵션으로 전달
+- **취소**: `AbortController`로 진행 중인 쿼리 중단 (`!session kill`)
+- **동시 실행 방지**: `isBusy` 플래그로 동시 요청 차단
+
+### SubprocessSessionManager (Gemini/OpenCode)
+
+매 메시지마다 CLI를 서브프로세스로 실행한다.
+
+```
+sendMessage(prompt)
+ ├─ buildCommand() → ["gemini", "-p", "prompt", "--yolo"]
+ ├─ spawn(command, { shell: true, cwd })
+ ├─ stdout/stderr 버퍼 수집
+ ├─ parseOutput() → { result, sessionId }
+ └─ result 텍스트 반환
+```
+
+- **Windows 호환**: `shell: true` 필수 — npm 패키지의 `.cmd` 래퍼 때문
+- **JSON 파싱**: `jsonOutput: true`이면 stdout에서 JSON 추출 (Claude subprocess용)
+- **세션 재개**: `resumeFlag`가 null이면 세션 유지 불가 (Gemini/OpenCode)
+
+---
+
+## 15. Discord UI 브릿지 (discordPrompt.ts)
+
+Claude의 `AskUserQuestion` 도구를 Discord 인터랙티브 컴포넌트로 변환하는 모듈.
+
+```
+handleAskUserQuestion(input, channel, userId)
+ └─ for each question:
+     └─ askSingleQuestion(question, channel, userId)
+         ├─ 옵션 ≤ 4개 → 버튼 (ButtonBuilder)
+         └─ 옵션 > 4개 → 셀렉트 메뉴 (StringSelectMenuBuilder)
+```
+
+| 항목 | 동작 |
+|------|------|
+| 타임아웃 | 60초, 초과 시 첫 번째 옵션 자동 선택 |
+| 유저 검증 | 요청자만 클릭 가능 (interaction.user.id 체크) |
+| 멀티셀렉트 | `multiSelect: true`이면 `setMaxValues()` 적용 |
+| 반환값 | `{ questions, answers: { [question]: selectedLabel } }` |
+
+---
+
+## 16. 유틸리티 함수
+
+### formatter.ts
+
+| 함수 | 설명 |
+|------|------|
+| `formatOutput(stdout, stderr, code)` | stdout + stderr 결합, 종료 코드 포함 |
+| `sendResult(message, content, options)` | ≤2000자: 코드블록 전송, >2000자: 미리보기 + `.txt` 파일 첨부 |
+
+### security.ts
+
+| 함수 | 설명 |
+|------|------|
+| `isAllowedUser(userId)` | `ALLOWED_USER_IDS` 화이트리스트 체크 (빈 Set = 전체 허용) |
+| `isCommandBlocked(command)` | `BLOCKED_COMMANDS`에 포함된 위험 명령어 차단 |
+
+### typing.ts
+
+| 함수 | 설명 |
+|------|------|
+| `withTyping<T>(message, fn)` | 비동기 함수 실행 동안 타이핑 인디케이터 표시 (8초 간격 갱신, Discord 10초 만료 대응) |
+
+### subprocess.ts (utils/)
+
+| 함수 | 설명 |
+|------|------|
+| `runCommand(command, options)` | 셸 명령어 실행 → `{ code, stdout, stderr }` 반환, 타임아웃 지원 |
+
+---
+
+## 17. 커맨드 추가 방법
+
+### 1단계: 커맨드 파일 생성
+
+`src/commands/ping.ts`:
+
+```typescript
+import type { PrefixCommand, CommandContext } from "../types.js";
+
+const command: PrefixCommand = {
+  name: "ping",
+  aliases: ["p"],
+  description: "봇 응답 확인",
+  async execute(ctx: CommandContext) {
+    await ctx.message.reply("Pong!");
+  },
+};
+
+export default command;
+```
+
+### 2단계: bot.ts에 정적 import 추가
+
+```typescript
+// 상단 import 영역
+import pingCommand from "./commands/ping.js";
+```
+
+### 3단계: allCommands 배열에 등록
+
+```typescript
+const allCommands: PrefixCommand[] = [
+  askCommand, sessionCommand, execCommand,
+  statusCommand, helpCommand, myidCommand,
+  pingCommand,  // ← 추가
+];
+```
+
+> 커맨드 로딩은 정적 import 방식이다.
+> .exe 번들링 호환을 위해 동적 import를 제거했으므로 `bot.ts`에 직접 등록해야 한다.
+
+---
+
+## 18. CLI 도구 추가 방법
+
+`src/config.ts`의 `CLI_TOOLS`에 새 항목을 추가한다:
+
+```typescript
+export const CLI_TOOLS: Record<string, CliTool> = {
+  // ... 기존 도구들 ...
+  aider: {
+    command: "aider",
+    maxTimeout: AI_CLI_TIMEOUT,
+    name: "Aider",
+    rulesFile: ".aider.conf.yml",
+    extraFlags: ["--yes"],
+    resumeFlag: null,        // 세션 재개 미지원
+    jsonOutput: false,       // plain text 출력
+    useAgentSdk: false,      // Agent SDK 없음 → subprocess
+  },
+};
+```
+
+| 필드 | 선택 기준 |
+|------|----------|
+| `useAgentSdk` | 전용 SDK가 있으면 `true`, 없으면 `false` (subprocess) |
+| `resumeFlag` | CLI가 세션 재개를 지원하면 해당 플래그 (예: `"--resume"`), 미지원 시 `null` |
+| `jsonOutput` | CLI가 JSON 출력을 지원하면 `true`, plain text면 `false` |
+| `extraFlags` | CLI 실행 시 항상 붙일 플래그 (자동 승인 등) |
+
+---
+
+## 19. 빌드 & 배포
+
+### 개발 모드
+
+```bash
+npm run dev          # tsx watch — 파일 변경 시 자동 재시작
+npm run start        # tsx — 일반 실행
+```
+
+### TypeScript 타입 체크
+
+```bash
+npm run build        # tsc — 컴파일 (타입 에러 확인용)
+```
+
+### exe 빌드 (Bun --compile)
+
+```bash
+npm run build:exe    # bun build --compile → dist/aidevelop-bot.exe
+# 또는
+build.bat            # 배치 파일 (dist/ 생성 + .env.example 복사)
+```
+
+#### 사전 요구
+
+- [Bun](https://bun.sh/) — `npm install -g bun`
+
+#### Bun을 사용하는 이유
+
+| 후보 | ESM 지원 | 네이티브 모듈 | 상태 |
+|------|---------|-------------|------|
+| pkg | X | 문제多 | 유지보수 중단 |
+| nexe | X | 문제多 | 오래됨 |
+| Node.js SEA | X (CJS만) | 가능 | ESM 미지원 |
+| **Bun --compile** | **O** | **O** | **활발** |
+
+이 프로젝트는 ESM(`"type": "module"`)이고 네이티브 모듈(Agent SDK의 ripgrep.node, discord.js의 sharp.node)이 있으므로 Bun이 유일하게 현실적인 선택이다.
+
+#### 빌드 시 고려사항
+
+- **동적 import 제거**: .exe 번들에는 파일시스템이 없으므로 모든 커맨드를 정적 import로 전환 (완료)
+- **dotenv 경로**: `process.cwd()` 기준으로 `.env`를 읽음 → .exe와 같은 폴더에 `.env` 필요
+- **네이티브 모듈**: Bun --compile이 `.node` 파일을 자동으로 번들에 포함
+
+#### 배포 산출물
+
+```
+dist/
+├── aidevelop-bot.exe    # 단일 실행파일 (~110MB)
+└── .env.example         # 설정 템플릿
+```
+
+---
+
+## 20. 주의사항 & 패턴
+
+### Discord.js 타입 가드
+
+```typescript
+// TextChannel을 사용해야 .send()가 존재
+import { TextChannel } from "discord.js";
+
+// sendTyping()은 모든 채널 타입에 없으므로 런타임 가드 필요
+if ("sendTyping" in channel) {
+  await channel.sendTyping();
+}
+```
+
+### Windows 서브프로세스
+
+```typescript
+// npm 패키지 CLI(.cmd 래퍼)는 shell: true 필수
+spawn(command, args, { shell: true, windowsHide: true });
+
+// 경로에 공백 포함 시 따옴표 처리
+const escaped = arg.includes(" ") ? `"${arg}"` : arg;
+```
+
+### 세션 공유 패턴
+
+`ask.ts`가 세션 참조를 갖고 있고, `session.ts`가 `getSession()`으로 같은 인스턴스에 접근한다:
+
+```typescript
+// ask.ts
+let session: ISessionManager;
+export function setSession(s: ISessionManager) { session = s; }
+export function getSession() { return session; }
+
+// bot.ts — 시작 시 연결
+const session = createSession(cliName, workingDir);
+setSession(session);
+
+// session.ts — 세션 상태 조회
+import { getSession } from "./ask.js";
+const session = getSession();
+```
+
+### 데이터 흐름 요약
+
+```
+[Discord 메시지]
+     │
+     ▼
+ bot.ts (MessageCreate 이벤트)
+     │ cmdName + args 파싱
+     ▼
+ commands/*.ts (execute)
+     │ 보안 체크 (security.ts)
+     │ 타이핑 표시 (typing.ts)
+     ▼
+ sessions/*.ts (sendMessage)
+     │ Claude: Agent SDK query()
+     │ Others: subprocess spawn()
+     ▼
+ utils/formatter.ts (sendResult)
+     │ ≤2000자: 코드블록
+     │ >2000자: .txt 첨부
+     ▼
+ [Discord 응답]
+```

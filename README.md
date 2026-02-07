@@ -13,11 +13,19 @@ Discord 메시지로 PC에 설치된 AI CLI 도구(Claude Code, Gemini CLI, Open
 
 ## 설치
 
-### 방법 1: 배치 파일 (Windows)
+### 방법 1: exe 파일 (권장 — Node.js 불필요)
+
+빌드된 `.exe` 파일을 사용하면 Node.js 설치 없이 바로 실행할 수 있습니다.
+
+1. `dist/` 폴더를 원하는 PC에 복사
+2. `.env.example`을 `.env`로 복사 후 값 입력
+3. `aidevelop-bot.exe` 실행
+
+### 방법 2: 배치 파일 (Windows)
 
 `setup.bat` 더블클릭 — Node.js 확인, 의존성 설치, `.env` 파일 생성까지 자동으로 진행.
 
-### 방법 2: 수동 설치
+### 방법 3: 수동 설치
 
 ```bash
 npm install
@@ -36,11 +44,15 @@ COMMAND_TIMEOUT=30
 
 ## 실행
 
-### 방법 1: 배치 파일
+### 방법 1: exe 파일
+
+`aidevelop-bot.exe` 더블클릭 (같은 폴더에 `.env` 필요)
+
+### 방법 2: 배치 파일
 
 `start_bot.bat` 더블클릭
 
-### 방법 2: 명령어
+### 방법 3: 명령어
 
 ```bash
 npx tsx src/bot.ts
@@ -154,6 +166,32 @@ ALLOWED_USER_IDS=111111111111111111,222222222222222222
 
 - **Claude Code**: Agent SDK를 통해 직접 통신. AI가 질문하면 Discord 버튼으로 응답 가능.
 - **Gemini CLI / OpenCode**: 서브프로세스로 실행. `-p "메시지"` 형태로 전달하고 출력을 수집.
+
+## exe 빌드 (배포용)
+
+[Bun](https://bun.sh/)을 사용해 단일 `.exe` 파일로 빌드합니다. 받는 사람은 Node.js 설치 없이 `.exe`와 `.env`만으로 실행할 수 있습니다.
+
+### 빌드 방법
+
+```bash
+# 방법 1: 배치 파일
+build.bat
+
+# 방법 2: npm 스크립트 (Bun 필요)
+npm run build:exe
+```
+
+### 빌드 결과
+
+```
+dist/
+├── aidevelop-bot.exe    ← 단일 실행파일
+└── .env.example         ← 설정 템플릿
+```
+
+### 사전 요구
+
+- [Bun](https://bun.sh/) 설치 — `npm install -g bun`
 
 ## 문제 해결
 

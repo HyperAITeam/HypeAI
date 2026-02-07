@@ -15,6 +15,14 @@ import { ClaudeSessionManager } from "./sessions/claude.js";
 import { SubprocessSessionManager } from "./sessions/subprocess.js";
 import { setSession } from "./commands/ask.js";
 
+// ── Static command imports (for .exe bundling) ──────────────────────
+import askCommand from "./commands/ask.js";
+import sessionCommand from "./commands/session.js";
+import execCommand from "./commands/exec.js";
+import statusCommand from "./commands/status.js";
+import helpCommand from "./commands/help.js";
+import myidCommand from "./commands/myid.js";
+
 // ── Console readline helper ──────────────────────────────────────────
 
 function ask(question: string): Promise<string> {
@@ -132,15 +140,19 @@ function ensureRulesMd(cliName: string, cwd: string): void {
   }
 }
 
-// ── Load commands ────────────────────────────────────────────────────
+// ── Load commands (static — compatible with .exe bundling) ──────────
 
-async function loadCommands(client: BotClient): Promise<void> {
-  const commandsDir = path.join(import.meta.dirname!, "commands");
-  const files = fs.readdirSync(commandsDir).filter((f) => f.endsWith(".ts") || f.endsWith(".js"));
+const allCommands: PrefixCommand[] = [
+  askCommand,
+  sessionCommand,
+  execCommand,
+  statusCommand,
+  helpCommand,
+  myidCommand,
+];
 
-  for (const file of files) {
-    const mod = await import(`./commands/${file}`);
-    const cmd: PrefixCommand = mod.default;
+function loadCommands(client: BotClient): void {
+  for (const cmd of allCommands) {
     if (!cmd?.name) continue;
     client.commands.set(cmd.name, cmd);
     if (cmd.aliases) {
@@ -190,7 +202,7 @@ async function main(): Promise<void> {
   setSession(session);
 
   // Load commands
-  await loadCommands(client);
+  loadCommands(client);
 
   // ── Events ──
 

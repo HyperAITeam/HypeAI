@@ -10,3 +10,4 @@ build/
 venv/
 node_modules/
 Test/
+CLAUDE.md

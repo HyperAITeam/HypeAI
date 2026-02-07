@@ -1,5 +1,9 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+import path from "node:path";
 import type { CliTool } from "./types.js";
+
+// .exe 실행 시에도 exe와 같은 폴더의 .env를 로드
+dotenv.config({ path: path.join(process.cwd(), ".env") });
 
 // Discord
 export const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN ?? "";

@@ -5,6 +5,7 @@
   "scripts": {
     "start": "tsx src/bot.ts",
     "build": "tsc",
+    "build:exe": "bun build src/bot.ts --compile --outfile dist/aidevelop-bot.exe --target bun-windows-x64",
     "dev": "tsx watch src/bot.ts"
   },
   "dependencies": {
