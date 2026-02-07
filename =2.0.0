@@ -1,9 +1,0 @@
-Collecting pywinpty
-  Downloading pywinpty-3.0.3-cp313-cp313-win_amd64.whl.metadata (5.9 kB)
-Downloading pywinpty-3.0.3-cp313-cp313-win_amd64.whl (2.1 MB)
-   ---------------------------------------- 2.1/2.1 MB 38.1 MB/s eta 0:00:00
-Installing collected packages: pywinpty
-Successfully installed pywinpty-3.0.3
-
-[notice] A new release of pip is available: 25.0.1 -> 26.0.1
-[notice] To update, run: python.exe -m pip install --upgrade pip
