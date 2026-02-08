@@ -204,6 +204,22 @@ dist/
 | 봇이 아무 반응 없음 | Discord Developer Portal에서 **Message Content Intent** 활성화했는지 확인 |
 | 응답이 너무 길어서 잘림 | 2000자 초과 시 자동으로 `.txt` 파일로 첨부됨 |
 
+## 개발자 참고
+
+### Git Hooks 설정 (권장)
+
+`.env` 파일 실수로 커밋하는 걸 방지하는 pre-commit hook이 포함되어 있습니다.
+
+```bash
+# Windows
+setup-hooks.bat
+
+# 또는 수동 설정
+git config core.hooksPath .husky
+```
+
+설정 후 `.env` 파일을 커밋하려고 하면 자동으로 차단됩니다.
+
 ## License
 
 [MIT](LICENSE)

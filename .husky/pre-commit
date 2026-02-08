@@ -1,0 +1,25 @@
+#!/bin/sh
+# ============================================================
+# Pre-commit hook: Block .env file commits
+# .env 파일 커밋 방지 훅
+# ============================================================
+
+# Check if .env is staged for commit
+if git diff --cached --name-only | grep -q "^\.env$"; then
+    echo ""
+    echo "============================================================"
+    echo "⚠️  COMMIT BLOCKED / 커밋 차단됨"
+    echo "============================================================"
+    echo ""
+    echo "You are trying to commit .env file!"
+    echo ".env 파일을 커밋하려고 합니다!"
+    echo ""
+    echo "This file contains sensitive information (tokens, secrets)."
+    echo "이 파일에는 민감한 정보(토큰, 비밀키)가 포함되어 있습니다."
+    echo ""
+    echo "To fix / 해결 방법:"
+    echo "  git reset HEAD .env"
+    echo ""
+    echo "============================================================"
+    exit 1
+fi

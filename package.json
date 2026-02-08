@@ -6,7 +6,9 @@
     "start": "tsx src/bot.ts",
     "build": "tsc",
     "build:exe": "bun build src/bot.ts --compile --outfile dist/aidevelop-bot.exe --target bun-windows-x64",
-    "dev": "tsx watch src/bot.ts"
+    "dev": "tsx watch src/bot.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.1",
@@ -17,6 +19,7 @@
   "devDependencies": {
     "@types/node": "^22.10.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.4"
   }
 }
