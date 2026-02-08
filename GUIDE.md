@@ -881,6 +881,22 @@ git push origin v1.0.0
 
 GitHub Actions 탭에서 빌드 진행 상황을 확인할 수 있으며, 완료 후 Releases 페이지에서 exe를 다운로드할 수 있다.
 
+### CI 워크플로우 (`/.github/workflows/ci.yml`)
+
+`main` 브랜치에 push 또는 PR이 올라오면 자동으로 타입 체크 + 테스트를 실행한다.
+
+```
+PR 생성 / push to main
+    │
+    ▼
+GitHub Actions (ubuntu-latest, Node 18)
+    ├─ npm ci
+    ├─ tsc --noEmit     (타입 체크)
+    └─ npm test         (vitest)
+```
+
+PR에 ✅/❌ 상태가 표시되어 코드 품질을 자동으로 검증한다.
+
 ---
 
 ## 20. 자동 셋업 & 설정 재로드
