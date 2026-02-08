@@ -8,7 +8,7 @@ import {
   GatewayIntentBits,
   ActivityType,
 } from "discord.js";
-import { DISCORD_BOT_TOKEN, COMMAND_PREFIX, CLI_TOOLS } from "./config.js";
+import { DISCORD_BOT_TOKEN, COMMAND_PREFIX, CLI_TOOLS, reloadConfig } from "./config.js";
 import type { BotClient, PrefixCommand, CommandContext } from "./types.js";
 import type { ISessionManager } from "./sessions/types.js";
 import { ClaudeSessionManager } from "./sessions/claude.js";
@@ -36,6 +36,52 @@ function ask(question: string): Promise<string> {
       resolve(a.trim());
     }),
   );
+}
+
+// ── First-run .env setup ─────────────────────────────────────────────
+
+async function setupEnv(): Promise<void> {
+  const envPath = path.join(process.cwd(), ".env");
+  if (fs.existsSync(envPath)) return;
+
+  console.log();
+  console.log("=".repeat(48));
+  console.log("  초기 설정 — .env 파일 생성");
+  console.log("=".repeat(48));
+  console.log();
+  console.log("  .env 파일이 없습니다. 필수 정보를 입력해주세요.");
+  console.log();
+
+  // 1) Discord 봇 토큰
+  let token: string;
+  while (true) {
+    token = await ask("  [1/2] Discord 봇 토큰: ");
+    if (token) break;
+    console.log("  봇 토큰은 필수입니다. 다시 입력해주세요.");
+  }
+
+  // 2) Discord 유저 ID
+  let userId: string;
+  while (true) {
+    userId = await ask("  [2/2] Discord 유저 ID: ");
+    if (userId) break;
+    console.log("  유저 ID는 필수입니다. 다시 입력해주세요.");
+  }
+
+  const envContent = [
+    `DISCORD_BOT_TOKEN=${token}`,
+    `ALLOWED_USER_IDS=${userId}`,
+    `COMMAND_PREFIX=!`,
+    `COMMAND_TIMEOUT=30`,
+    `AI_CLI_TIMEOUT=300`,
+  ].join("\n") + "\n";
+
+  fs.writeFileSync(envPath, envContent, "utf-8");
+  reloadConfig();
+
+  console.log();
+  console.log("  .env 파일이 생성되었습니다!");
+  console.log();
 }
 
 // ── Startup interactive setup ────────────────────────────────────────
@@ -177,6 +223,8 @@ function createSession(cliName: string, cwd: string): ISessionManager {
 // ── Main ─────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  await setupEnv();
+
   if (!DISCORD_BOT_TOKEN) {
     console.error("DISCORD_BOT_TOKEN is not set. Check your .env file.");
     process.exit(1);

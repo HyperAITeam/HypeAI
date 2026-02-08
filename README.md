@@ -11,56 +11,64 @@ Discord 메시지로 PC에 설치된 AI CLI 도구(Claude Code, Gemini CLI, Open
   - [Gemini CLI](https://github.com/google-gemini/gemini-cli) — `npm install -g @anthropic-ai/gemini-cli`
   - [OpenCode](https://opencode.ai/)
 
-## 설치
+## 사전 준비: Discord 봇 만들기
+
+봇을 사용하려면 먼저 Discord 봇을 만들어야 합니다:
+
+1. [Discord Developer Portal](https://discord.com/developers/applications) 접속 → **New Application** → 이름 입력 → 생성
+2. **Bot** 탭 → **Reset Token** → 토큰 복사 (나중에 입력합니다)
+3. **Bot** 탭 → **Privileged Gateway Intents**에서 **Message Content Intent** 켜기 (필수!)
+4. **OAuth2** → **URL Generator** → Scopes: `bot` 체크 → Permissions: `Send Messages`, `Read Message History`, `Attach Files` 체크 → 생성된 URL을 브라우저에서 열어 서버에 초대
+
+> 토큰은 비밀번호와 같습니다. 절대 공유하지 마세요!
+
+## 설치 & 실행
 
 ### 방법 1: exe 파일 (권장 — Node.js 불필요)
 
 빌드된 `.exe` 파일을 사용하면 Node.js 설치 없이 바로 실행할 수 있습니다.
 
-[GitHub Releases](../../releases/latest) 페이지에서 최신 버전을 다운로드하세요:
+1. [GitHub Releases](../../releases/latest)에서 `aidevelop-bot.exe` 다운로드
+2. `aidevelop-bot.exe` 더블클릭하여 실행
+3. 첫 실행 시 자동으로 설정 화면이 표시됩니다:
 
-1. `aidevelop-bot.exe`와 `.env.example` 다운로드
-2. `.env.example`을 `.env`로 복사 후 값 입력
-3. `aidevelop-bot.exe` 실행
+```
+================================================
+  초기 설정 — .env 파일 생성
+================================================
 
-### 방법 2: 배치 파일 (Windows)
+  .env 파일이 없습니다. 필수 정보를 입력해주세요.
+
+  [1/2] Discord 봇 토큰: (위에서 복사한 토큰 붙여넣기)
+  [2/2] Discord 유저 ID: (내 Discord ID 입력)
+
+  .env 파일이 생성되었습니다!
+```
+
+4. 이어서 AI CLI 도구 선택 → 작업 폴더 입력 → 봇 시작
+
+> **Discord 유저 ID 확인 방법**: Discord 설정 → 고급 → 개발자 모드 켜기 → 내 프로필 우클릭 → ID 복사.
+> 또는 봇 실행 후 `!myid` 입력하면 알려줍니다.
+
+### 방법 2: 배치 파일 (Windows — Node.js 필요)
 
 `setup.bat` 더블클릭 — Node.js 확인, 의존성 설치, `.env` 파일 생성까지 자동으로 진행.
 
-### 방법 3: 수동 설치
+실행: `start_bot.bat` 더블클릭
+
+### 방법 3: 수동 설치 (Node.js 필요)
 
 ```bash
 npm install
-```
-
-`.env.example`을 `.env`로 복사 후 값 입력:
-
-```
-DISCORD_BOT_TOKEN=여기에_봇_토큰
-ALLOWED_USER_IDS=여기에_디스코드_유저ID
-COMMAND_PREFIX=!
-COMMAND_TIMEOUT=30
-```
-
-> Discord User ID를 모르면? 봇 실행 후 `!myid` 입력하면 알려줍니다.
-
-## 실행
-
-### 방법 1: exe 파일
-
-`aidevelop-bot.exe` 더블클릭 (같은 폴더에 `.env` 필요)
-
-### 방법 2: 배치 파일
-
-`start_bot.bat` 더블클릭
-
-### 방법 3: 명령어
-
-```bash
 npx tsx src/bot.ts
 ```
 
-실행하면 콘솔에서 두 가지를 선택합니다:
+> `.env` 파일이 없으면 첫 실행 시 자동으로 설정 화면이 표시됩니다.
+> 수동으로 만들려면 `.env.example`을 `.env`로 복사 후 값을 입력하세요.
+
+## 실행 흐름
+
+봇을 실행하면 콘솔에서 두 가지를 선택합니다:
 
 ```
 [1/2] Select AI CLI tool:

@@ -166,6 +166,26 @@ start_bot.bat
 npx tsx src/bot.ts
 ```
 
+### 첫 실행 시 자동 셋업
+
+`.env` 파일이 없으면 자동으로 초기 설정 화면이 표시됩니다:
+
+```
+================================================
+  초기 설정 — .env 파일 생성
+================================================
+
+  .env 파일이 없습니다. 필수 정보를 입력해주세요.
+
+  [1/2] Discord 봇 토큰: MTIz...
+  [2/2] Discord 유저 ID: 123456789012345678
+
+  .env 파일이 생성되었습니다!
+```
+
+설정 완료 후 바로 아래 CLI 선택 화면으로 이어집니다.
+이미 `.env`가 있으면 이 단계는 자동으로 건너뜁니다.
+
 ### 실행 시 설정 화면
 
 ```
@@ -863,7 +883,49 @@ GitHub Actions 탭에서 빌드 진행 상황을 확인할 수 있으며, 완료
 
 ---
 
-## 20. 주의사항 & 패턴
+## 20. 자동 셋업 & 설정 재로드
+
+### setupEnv() — 첫 실행 자동 설정
+
+`bot.ts`의 `setupEnv()`는 `.env` 파일이 없을 때 대화형으로 필수 값을 입력받아 생성한다.
+
+```
+main()
+ ├─ setupEnv()
+ │   ├─ .env 존재? → return (스킵)
+ │   ├─ Discord 봇 토큰 입력
+ │   ├─ Discord 유저 ID 입력
+ │   ├─ .env 파일 생성
+ │   └─ reloadConfig() 호출
+ ├─ DISCORD_BOT_TOKEN 체크
+ ├─ startupSetup() (CLI 선택 + 작업폴더)
+ └─ client.login()
+```
+
+### reloadConfig() — ES 모듈 live binding
+
+`config.ts`의 env 변수들은 `export let`으로 선언되어 있다.
+ES 모듈에서 `export let`은 **live binding**을 생성하므로, 내보낸 모듈에서 값을 재할당하면 가져온 모듈에서도 즉시 반영된다.
+
+```typescript
+// config.ts
+export let DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN ?? "";
+
+export function reloadConfig(): void {
+  dotenv.config({ override: true });
+  DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN ?? ""; // 재할당 → 즉시 반영
+}
+
+// bot.ts
+import { DISCORD_BOT_TOKEN, reloadConfig } from "./config.js";
+reloadConfig(); // 호출 후 DISCORD_BOT_TOKEN이 새 값으로 갱신됨
+```
+
+이 방식으로 `.env` 파일 생성 후 프로세스 재시작 없이 모든 설정값이 갱신된다.
+
+---
+
+## 21. 주의사항 & 패턴
 
 ### Discord.js 타입 가드
 

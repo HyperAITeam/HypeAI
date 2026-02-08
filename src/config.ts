@@ -6,11 +6,11 @@ import type { CliTool } from "./types.js";
 dotenv.config({ path: path.join(process.cwd(), ".env") });
 
 // Discord
-export const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN ?? "";
-export const COMMAND_PREFIX = process.env.COMMAND_PREFIX ?? "!";
+export let DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN ?? "";
+export let COMMAND_PREFIX = process.env.COMMAND_PREFIX ?? "!";
 
 // Security
-export const ALLOWED_USER_IDS = new Set(
+export let ALLOWED_USER_IDS = new Set(
   (process.env.ALLOWED_USER_IDS ?? "")
     .split(",")
     .map((id) => id.trim())
@@ -18,8 +18,23 @@ export const ALLOWED_USER_IDS = new Set(
 );
 
 // Timeouts
-export const COMMAND_TIMEOUT = parseInt(process.env.COMMAND_TIMEOUT ?? "30", 10);
-export const AI_CLI_TIMEOUT = parseInt(process.env.AI_CLI_TIMEOUT ?? "300", 10);
+export let COMMAND_TIMEOUT = parseInt(process.env.COMMAND_TIMEOUT ?? "30", 10);
+export let AI_CLI_TIMEOUT = parseInt(process.env.AI_CLI_TIMEOUT ?? "300", 10);
+
+/** Reload config from .env (used after interactive setup creates .env) */
+export function reloadConfig(): void {
+  dotenv.config({ path: path.join(process.cwd(), ".env"), override: true });
+  DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN ?? "";
+  COMMAND_PREFIX = process.env.COMMAND_PREFIX ?? "!";
+  ALLOWED_USER_IDS = new Set(
+    (process.env.ALLOWED_USER_IDS ?? "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean),
+  );
+  COMMAND_TIMEOUT = parseInt(process.env.COMMAND_TIMEOUT ?? "30", 10);
+  AI_CLI_TIMEOUT = parseInt(process.env.AI_CLI_TIMEOUT ?? "300", 10);
+}
 
 // CLI tool definitions
 export const CLI_TOOLS: Record<string, CliTool> = {
