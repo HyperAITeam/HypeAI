@@ -5,4 +5,4 @@ bun build src/bot.ts --compile --outfile dist/aidevelop-bot.exe --target bun-win
 copy .env.example dist\.env.example
 echo.
 echo Build complete: dist\aidevelop-bot.exe
-echo Copy .env.example to .env and fill in your settings.
+echo Run the exe - .env will be created automatically on first run.
