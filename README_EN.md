@@ -248,6 +248,19 @@ Contributions are welcome! Please check [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
+## ☕ Support
+
+If this project helped you, buy me a coffee!
+
+<div align="center">
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/osgoodyz)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-F16061?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/osgoodyz)
+
+</div>
+
+---
+
 ## 📄 License
 
 [MIT](LICENSE) © 2024
