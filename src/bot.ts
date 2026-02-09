@@ -210,11 +210,68 @@ function loadCommands(client: BotClient): void {
   }
 }
 
+// ── Prerequisites check ─────────────────────────────────────────────
+
+function checkClaudePrerequisites(): void {
+  const { execSync } = require("node:child_process");
+
+  // 1) cli.js 존재 확인
+  const exeDir = path.dirname(process.execPath);
+  const cliInExeDir = path.join(exeDir, "cli.js");
+  const cliInNodeModules = path.join(
+    process.cwd(),
+    "node_modules",
+    "@anthropic-ai",
+    "claude-agent-sdk",
+    "cli.js",
+  );
+  const hasCli = fs.existsSync(cliInExeDir) || fs.existsSync(cliInNodeModules);
+
+  if (!hasCli) {
+    console.error();
+    console.error("  [ERROR] cli.js 파일을 찾을 수 없습니다!");
+    console.error();
+    console.error("  Claude Code를 사용하려면 exe와 같은 폴더에");
+    console.error("  cli.js 파일이 있어야 합니다.");
+    console.error();
+    console.error("  해결 방법:");
+    console.error("    - Release에서 cli.js를 함께 다운로드하세요.");
+    console.error("    - 또는 build.bat으로 다시 빌드하세요.");
+    console.error();
+    process.exit(1);
+  }
+
+  // 2) Node.js 설치 확인 (Agent SDK가 subprocess로 node를 사용)
+  try {
+    execSync("node --version", { stdio: "ignore" });
+  } catch {
+    console.error();
+    console.error("  [ERROR] Node.js가 설치되어 있지 않습니다!");
+    console.error();
+    console.error("  Claude Code Agent SDK는 내부적으로 Node.js를");
+    console.error("  사용하여 Claude Code를 실행합니다.");
+    console.error();
+    console.error("  https://nodejs.org 에서 Node.js를 설치해주세요.");
+    console.error();
+    process.exit(1);
+  }
+
+  // 3) ANTHROPIC_API_KEY 확인
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.error();
+    console.error("  [WARNING] ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.");
+    console.error("  Claude Code 사용 시 API 키가 필요합니다.");
+    console.error("  .env 파일 또는 시스템 환경변수에 설정해주세요.");
+    console.error();
+  }
+}
+
 // ── Create session manager ───────────────────────────────────────────
 
 function createSession(cliName: string, cwd: string): ISessionManager {
   const tool = CLI_TOOLS[cliName];
   if (tool.useAgentSdk) {
+    checkClaudePrerequisites();
     return new ClaudeSessionManager(tool, cwd);
   }
   return new SubprocessSessionManager(cliName, tool, cwd);

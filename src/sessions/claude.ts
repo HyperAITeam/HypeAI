@@ -1,8 +1,37 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import path from "node:path";
+import fs from "node:fs";
 import type { Message, TextChannel } from "discord.js";
 import type { ISessionManager, SessionInfo } from "./types.js";
 import type { CliTool } from "../types.js";
 import { handleAskUserQuestion } from "../utils/discordPrompt.js";
+
+/**
+ * Bun exe 환경에서 Agent SDK의 cli.js 경로를 자동 해석.
+ * Bun 번들 실행 시 import.meta.url이 가상 경로(~BUN)를 반환하므로
+ * exe와 같은 폴더에 배포된 cli.js를 직접 지정해야 한다.
+ */
+function resolveClaudeCodePath(): string | undefined {
+  // exe 옆에 cli.js가 있으면 해당 경로 사용 (빌드 배포 환경)
+  const exeDir = path.dirname(process.execPath);
+  const candidate = path.join(exeDir, "cli.js");
+  if (fs.existsSync(candidate)) {
+    return candidate;
+  }
+  // node_modules 내 SDK 패키지에서 직접 탐색 (개발 환경 폴백)
+  const nmCandidate = path.join(
+    process.cwd(),
+    "node_modules",
+    "@anthropic-ai",
+    "claude-agent-sdk",
+    "cli.js",
+  );
+  if (fs.existsSync(nmCandidate)) {
+    return nmCandidate;
+  }
+  // 둘 다 없으면 SDK 기본 자동 해석에 맡김
+  return undefined;
+}
 
 /**
  * Claude session using the Agent SDK.
@@ -34,10 +63,12 @@ export class ClaudeSessionManager implements ISessionManager {
     this.abortController = new AbortController();
 
     try {
+      const cliPath = resolveClaudeCodePath();
       const options: Record<string, unknown> = {
         cwd: this.cwd,
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
+        ...(cliPath && { pathToClaudeCodeExecutable: cliPath }),
         canUseTool: async (
           toolName: string,
           input: Record<string, unknown>,

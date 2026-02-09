@@ -12,3 +12,5 @@ node_modules/
 Test/
 CLAUDE.md
 GEMINI.md
+experiments/
+nul

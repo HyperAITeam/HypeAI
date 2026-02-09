@@ -25,7 +25,9 @@ jobs:
         run: bun install
 
       - name: Build Windows executable
-        run: bun build src/bot.ts --compile --outfile dist/aidevelop-bot.exe --target bun-windows-x64
+        run: |
+          bun build src/bot.ts --compile --outfile dist/aidevelop-bot.exe --target bun-windows-x64
+          cp node_modules/@anthropic-ai/claude-agent-sdk/cli.js dist/cli.js
 
       - name: Delete existing release
         run: gh release delete ${{ github.ref_name }} --yes --cleanup-tag || true
@@ -37,12 +39,13 @@ jobs:
         with:
           files: |
             dist/aidevelop-bot.exe
+            dist/cli.js
             .env.example
           body: |
             ## ${{ github.ref_name }}
 
             ### 다운로드 및 실행
-            1. `aidevelop-bot.exe`와 `.env.example` 다운로드
+            1. `aidevelop-bot.exe`, `cli.js`, `.env.example` 다운로드 (같은 폴더에 배치)
             2. `.env.example`을 `.env`로 복사 후 토큰/ID 입력
             3. `aidevelop-bot.exe` 실행
           draft: false

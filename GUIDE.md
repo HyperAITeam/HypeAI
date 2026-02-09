@@ -38,6 +38,24 @@ Discord 메시지를 통해 내 Windows PC에서 실행 중인 AI CLI 도구(Cla
 | **Node.js 18+** | `node --version` | https://nodejs.org/ |
 | **AI CLI 도구** (1개 이상) | 아래 참고 | 각 도구 공식 문서 |
 
+> **중요**: exe 파일로 실행하더라도 **Node.js는 반드시 설치**되어 있어야 합니다.
+> Claude Code Agent SDK가 내부적으로 `node cli.js`를 subprocess로 실행하기 때문입니다.
+
+### Claude Code 사용 시 추가 요구사항
+
+| 항목 | 설명 |
+|------|------|
+| **ANTHROPIC_API_KEY** | Anthropic API 키. `.env` 파일 또는 시스템 환경변수에 설정 |
+| **cli.js** | Agent SDK 런타임 파일. exe 실행 시 exe와 같은 폴더에 있어야 함 |
+
+```bash
+# API 키 설정 (시스템 환경변수)
+set ANTHROPIC_API_KEY=sk-ant-xxxxx
+
+# 또는 .env 파일에 추가
+echo ANTHROPIC_API_KEY=sk-ant-xxxxx >> .env
+```
+
 ### AI CLI 도구 설치 확인
 
 사용할 CLI 도구가 설치되어 있는지 확인:
@@ -130,6 +148,9 @@ DISCORD_BOT_TOKEN=여기에_봇_토큰_붙여넣기
 # [필수] 허가된 Discord 유저 ID (여러 명이면 쉼표로 구분)
 ALLOWED_USER_IDS=123456789012345678
 
+# [Claude 사용 시 필수] Anthropic API 키 (시스템 환경변수로도 설정 가능)
+ANTHROPIC_API_KEY=sk-ant-xxxxx
+
 # [선택] 명령어 접두사 (기본: !)
 COMMAND_PREFIX=!
 
@@ -146,6 +167,7 @@ AI_CLI_TIMEOUT=300
 |------|:----:|--------|------|
 | `DISCORD_BOT_TOKEN` | O | — | Discord 봇 토큰 |
 | `ALLOWED_USER_IDS` | O | — | 봇 사용 허가 유저 ID (쉼표 구분) |
+| `ANTHROPIC_API_KEY` | Claude 사용 시 | — | Anthropic API 키 (시스템 환경변수로도 설정 가능) |
 | `COMMAND_PREFIX` | | `!` | 명령어 접두사 |
 | `COMMAND_TIMEOUT` | | `30` | `!exec` 명령 타임아웃 (초) |
 | `AI_CLI_TIMEOUT` | | `300` | AI CLI 응답 타임아웃 (초) |
@@ -154,13 +176,28 @@ AI_CLI_TIMEOUT=300
 
 ## 5. 봇 실행
 
-### 방법 A: start_bot.bat 더블클릭
+### 방법 A: exe 파일 실행 (권장)
+
+[GitHub Releases](../../releases/latest)에서 다운로드 후 실행합니다.
+
+**필요한 파일** (같은 폴더에 배치):
+```
+my-bot-folder/
+├── aidevelop-bot.exe    ← 실행파일
+├── cli.js               ← Claude Agent SDK 런타임 (필수!)
+└── .env                 ← 설정 파일 (첫 실행 시 자동 생성)
+```
+
+> `cli.js`가 없으면 Claude Code 선택 시 에러가 발생합니다.
+> Gemini CLI / OpenCode만 사용한다면 `cli.js`는 필요 없습니다.
+
+### 방법 B: start_bot.bat 더블클릭
 
 ```
 start_bot.bat
 ```
 
-### 방법 B: 직접 실행
+### 방법 C: 직접 실행
 
 ```bash
 npx tsx src/bot.ts
@@ -514,6 +551,31 @@ net user, net localgroup
 
 ## 12. FAQ / 문제 해결
 
+### Q: exe 실행 시 "cli.js 파일을 찾을 수 없습니다" 에러
+- `cli.js` 파일이 exe와 **같은 폴더**에 있어야 합니다
+- [GitHub Releases](../../releases/latest)에서 `cli.js`를 함께 다운로드하세요
+- 직접 빌드하는 경우 `build.bat`이 자동으로 `dist/` 폴더에 복사합니다
+- Gemini CLI / OpenCode만 사용한다면 `cli.js`는 필요 없습니다
+
+### Q: exe 실행 시 "Node.js가 설치되어 있지 않습니다" 에러
+- Claude Code는 Agent SDK가 내부적으로 `node cli.js`를 실행하므로 **Node.js v18+** 필수
+- https://nodejs.org/ 에서 설치 후 새 CMD 창에서 exe를 다시 실행하세요
+- `node --version`으로 정상 설치 확인
+
+### Q: "ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다" 경고
+- Claude Code 사용 시 Anthropic API 키가 필요합니다
+- 설정 방법 (택 1):
+  - `.env` 파일에 `ANTHROPIC_API_KEY=sk-ant-xxxxx` 추가
+  - Windows 시스템 환경변수에 `ANTHROPIC_API_KEY` 등록
+
+### Q: exe만 있으면 아무것도 설치 안 해도 되나요?
+- **아닙니다.** exe는 Discord 봇 부분만 포함합니다
+- Claude Code 사용 시 필요한 것:
+  1. `cli.js` — exe와 같은 폴더에 배치
+  2. **Node.js v18+** — 시스템에 설치
+  3. **ANTHROPIC_API_KEY** — 환경변수 설정
+- Gemini CLI / OpenCode 사용 시에는 해당 CLI가 전역 설치되어 있어야 합니다
+
 ### Q: 봇이 응답하지 않아요
 - `.env`의 `DISCORD_BOT_TOKEN`이 올바른지 확인
 - Discord Developer Portal에서 `MESSAGE CONTENT INTENT`가 켜져 있는지 확인
@@ -814,12 +876,20 @@ npm run build        # tsc — 컴파일 (타입 에러 확인용)
 ```bash
 npm run build:exe    # bun build --compile → dist/aidevelop-bot.exe
 # 또는
-build.bat            # 배치 파일 (dist/ 생성 + .env.example 복사)
+build.bat            # 배치 파일 (dist/ 생성 + cli.js 복사 + .env.example 복사)
 ```
 
 #### 사전 요구
 
 - [Bun](https://bun.sh/) — `npm install -g bun`
+
+#### 배포 시 사용자 PC 필수 조건
+
+| 항목 | 필요 여부 | 설명 |
+|------|-----------|------|
+| **Node.js v18+** | Claude Code 사용 시 필수 | Agent SDK가 `node cli.js`를 subprocess로 실행 |
+| **ANTHROPIC_API_KEY** | Claude Code 사용 시 필수 | Anthropic API 인증용 환경변수 |
+| **cli.js** | Claude Code 사용 시 필수 | exe와 같은 폴더에 배치해야 함 |
 
 #### Bun을 사용하는 이유
 
@@ -837,14 +907,21 @@ build.bat            # 배치 파일 (dist/ 생성 + .env.example 복사)
 - **동적 import 제거**: .exe 번들에는 파일시스템이 없으므로 모든 커맨드를 정적 import로 전환 (완료)
 - **dotenv 경로**: `process.cwd()` 기준으로 `.env`를 읽음 → .exe와 같은 폴더에 `.env` 필요
 - **네이티브 모듈**: Bun --compile이 `.node` 파일을 자동으로 번들에 포함
+- **cli.js 복사**: Agent SDK의 `cli.js`는 subprocess로 실행되므로 exe에 번들링되지 않음 → `build.bat`이 자동으로 `dist/`에 복사
 
 #### 배포 산출물
 
 ```
 dist/
-├── aidevelop-bot.exe    # 단일 실행파일 (~110MB)
+├── aidevelop-bot.exe    # 실행파일 (~110MB)
+├── cli.js               # Claude Agent SDK 런타임 (exe와 같은 폴더 필수)
 └── .env.example         # 설정 템플릿
 ```
+
+> **왜 cli.js가 별도 파일인가?**
+> Agent SDK는 내부적으로 `node cli.js`를 자식 프로세스로 실행하여 Claude Code를 구동합니다.
+> Bun이 exe를 빌드할 때 `import.meta.url`이 가상 경로(`~BUN/root/`)로 변환되어
+> SDK가 자동으로 `cli.js`를 찾지 못합니다. 따라서 exe 옆에 물리적 파일이 필요합니다.
 
 ### GitHub Actions 자동 릴리스
 
@@ -862,7 +939,7 @@ GitHub Actions (ubuntu-latest)
     ├─ bun build --compile --target bun-windows-x64
     │   └─ Linux에서 Windows exe 크로스 컴파일
     └─ softprops/action-gh-release@v2
-        └─ Release 생성 + aidevelop-bot.exe, .env.example 업로드
+        └─ Release 생성 + aidevelop-bot.exe, cli.js, .env.example 업로드
 ```
 
 - **러너**: `ubuntu-latest` — Bun의 `--target bun-windows-x64`로 Linux에서 Windows exe 크로스 컴파일 가능

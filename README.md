@@ -24,12 +24,17 @@ Discord 메시지로 PC에 설치된 AI CLI 도구(Claude Code, Gemini CLI, Open
 
 ## 설치 & 실행
 
-### 방법 1: exe 파일 (권장 — Node.js 불필요)
+### 방법 1: exe 파일 (권장)
 
-빌드된 `.exe` 파일을 사용하면 Node.js 설치 없이 바로 실행할 수 있습니다.
+빌드된 `.exe` 파일로 간편하게 실행할 수 있습니다.
 
-1. [GitHub Releases](../../releases/latest)에서 `aidevelop-bot.exe` 다운로드
-2. `aidevelop-bot.exe` 더블클릭하여 실행
+> **사전 요구**: Claude Code를 사용하려면 **Node.js v18+**이 설치되어 있어야 합니다.
+> Agent SDK가 내부적으로 Node.js를 사용하여 Claude Code를 실행합니다.
+> 또한 **ANTHROPIC_API_KEY** 환경변수가 설정되어 있어야 합니다.
+
+1. [GitHub Releases](../../releases/latest)에서 `aidevelop-bot.exe`, `cli.js`, `.env.example` 다운로드
+2. **세 파일을 같은 폴더에 배치** (`cli.js`가 없으면 Claude Code 사용 불가!)
+3. `aidevelop-bot.exe` 더블클릭하여 실행
 3. 첫 실행 시 자동으로 설정 화면이 표시됩니다:
 
 ```
@@ -45,7 +50,8 @@ Discord 메시지로 PC에 설치된 AI CLI 도구(Claude Code, Gemini CLI, Open
   .env 파일이 생성되었습니다!
 ```
 
-4. 이어서 AI CLI 도구 선택 → 작업 폴더 입력 → 봇 시작
+4. `.env.example`을 `.env`로 복사 후 값 입력 (또는 첫 실행 시 자동 설정)
+5. 이어서 AI CLI 도구 선택 → 작업 폴더 입력 → 봇 시작
 
 > **Discord 유저 ID 확인 방법**: Discord 설정 → 고급 → 개발자 모드 켜기 → 내 프로필 우클릭 → ID 복사.
 > 또는 봇 실행 후 `!myid` 입력하면 알려줍니다.
@@ -145,6 +151,7 @@ Claude가 질문합니다:
 |------|------|--------|------|
 | `DISCORD_BOT_TOKEN` | O | — | Discord 봇 토큰 |
 | `ALLOWED_USER_IDS` | O | — | 허용할 유저 ID (쉼표로 여러 명 가능) |
+| `ANTHROPIC_API_KEY` | Claude 사용 시 | — | Anthropic API 키 (.env 또는 시스템 환경변수) |
 | `COMMAND_PREFIX` | X | `!` | 명령어 접두사 |
 | `COMMAND_TIMEOUT` | X | `30` | CMD 명령어 타임아웃 (초) |
 | `AI_CLI_TIMEOUT` | X | `300` | AI CLI 타임아웃 (초) |
@@ -179,7 +186,9 @@ ALLOWED_USER_IDS=111111111111111111,222222222222222222
 
 ## exe 빌드 (배포용)
 
-[Bun](https://bun.sh/)을 사용해 단일 `.exe` 파일로 빌드합니다. 받는 사람은 Node.js 설치 없이 `.exe`와 `.env`만으로 실행할 수 있습니다.
+[Bun](https://bun.sh/)을 사용해 `.exe` 파일로 빌드합니다.
+
+> **참고**: Claude Code 사용 시 받는 사람의 PC에도 **Node.js v18+** 설치와 **ANTHROPIC_API_KEY** 환경변수 설정이 필요합니다.
 
 ### 빌드 방법
 
@@ -195,7 +204,8 @@ npm run build:exe
 
 ```
 dist/
-├── aidevelop-bot.exe    ← 단일 실행파일
+├── aidevelop-bot.exe    ← 실행파일
+├── cli.js               ← Claude Agent SDK 런타임 (exe와 반드시 같은 폴더)
 └── .env.example         ← 설정 템플릿
 ```
 
@@ -207,6 +217,9 @@ dist/
 
 | 증상 | 해결 |
 |------|------|
+| `cli.js 파일을 찾을 수 없습니다` | exe와 같은 폴더에 `cli.js` 파일이 있는지 확인. Release에서 함께 다운로드 |
+| `Node.js가 설치되어 있지 않습니다` | [Node.js](https://nodejs.org/) v18+ 설치 필요 (Claude Code Agent SDK 실행에 필수) |
+| `ANTHROPIC_API_KEY` 경고 | Anthropic API 키를 `.env` 또는 시스템 환경변수에 설정 |
 | `You are not authorized` | `!myid`로 ID 확인 → `.env`의 `ALLOWED_USER_IDS`에 입력 → 봇 재시작 |
 | `is not installed or not in PATH` | 해당 CLI 도구가 설치되어 있는지 확인 |
 | 봇이 아무 반응 없음 | Discord Developer Portal에서 **Message Content Intent** 활성화했는지 확인 |
