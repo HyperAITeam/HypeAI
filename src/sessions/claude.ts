@@ -64,11 +64,16 @@ export class ClaudeSessionManager implements ISessionManager {
 
     try {
       const cliPath = resolveClaudeCodePath();
+      console.log(`  [Claude] cliPath: ${cliPath ?? "(SDK default)"}`);
+      console.log(`  [Claude] cwd: ${this.cwd}`);
+
       const options: Record<string, unknown> = {
         cwd: this.cwd,
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
+        abortController: this.abortController,
         ...(cliPath && { pathToClaudeCodeExecutable: cliPath }),
+        stderr: (data: string) => console.error("[Claude stderr]", data),
         canUseTool: async (
           toolName: string,
           input: Record<string, unknown>,
@@ -92,7 +97,9 @@ export class ClaudeSessionManager implements ISessionManager {
       let resultText = "";
       let newSessionId: string | null = null;
 
+      console.log("  [Claude] Starting query...");
       for await (const msg of query({ prompt: message, options: options as any })) {
+        console.log(`  [Claude] msg: ${msg.type}${(msg as any).subtype ? "/" + (msg as any).subtype : ""}`);
         if (msg.type === "system" && (msg as any).subtype === "init") {
           newSessionId = (msg as any).session_id ?? null;
         }
@@ -104,6 +111,7 @@ export class ClaudeSessionManager implements ISessionManager {
           }
         }
       }
+      console.log("  [Claude] Query complete.");
 
       if (newSessionId) {
         this.sessionId = newSessionId;
