@@ -31,8 +31,12 @@ export interface CliTool {
   maxTimeout: number;
   name: string;
   rulesFile: string;
+  /** 메시지 전달 방식: ["-p"] → `cli -p "msg"`, ["run"] → `cli run "msg"` */
+  promptArgs: string[];
   extraFlags: string[];
   resumeFlag: string | null;
+  /** 두 번째 메시지부터 추가할 세션 계속 플래그 (e.g. "-c") */
+  continueFlag: string | null;
   jsonOutput: boolean;
   /** true = use Agent SDK instead of subprocess */
   useAgentSdk: boolean;

@@ -3,6 +3,11 @@ import type { Message } from "discord.js";
 import type { ISessionManager, SessionInfo } from "./types.js";
 import type { CliTool } from "../types.js";
 
+/** ANSI escape code 제거 (터미널 색상/커서 코드 → Discord에선 깨짐) */
+function stripAnsi(s: string): string {
+  return s.replace(/\x1B(?:\[[0-9;]*[A-Za-z]|\][^\x07]*\x07)/g, "");
+}
+
 /**
  * Subprocess-based session for CLIs without an SDK (Gemini, OpenCode).
  *
@@ -47,14 +52,20 @@ export class SubprocessSessionManager implements ISessionManager {
       const chunks: Buffer[] = [];
       const errChunks: Buffer[] = [];
 
-      proc.stdout?.on("data", (d: Buffer) => chunks.push(d));
-      proc.stderr?.on("data", (d: Buffer) => errChunks.push(d));
+      proc.stdout?.on("data", (d: Buffer) => {
+        chunks.push(d);
+        console.log(`  [${this.cliName}] stdout: ${stripAnsi(d.toString()).trim().slice(0, 150)}`);
+      });
+      proc.stderr?.on("data", (d: Buffer) => {
+        errChunks.push(d);
+        console.error(`  [${this.cliName}] stderr: ${stripAnsi(d.toString()).trim().slice(0, 150)}`);
+      });
 
       proc.on("close", (code) => {
         this.proc = null;
 
-        const stdout = Buffer.concat(chunks).toString("utf-8");
-        const stderr = Buffer.concat(errChunks).toString("utf-8");
+        const stdout = stripAnsi(Buffer.concat(chunks).toString("utf-8"));
+        const stderr = stripAnsi(Buffer.concat(errChunks).toString("utf-8"));
 
         console.log(`  [${this.cliName}] exit: code=${code}`);
         if (stderr.trim()) console.error(`  [${this.cliName}] stderr: ${stderr.trim().slice(0, 200)}`);
@@ -120,9 +131,13 @@ export class SubprocessSessionManager implements ISessionManager {
   // --- internals ---
 
   private buildCommand(message: string): string[] {
-    const cmd = [this.tool.command, "-p", message, ...this.tool.extraFlags];
+    const cmd = [this.tool.command, ...this.tool.promptArgs, message, ...this.tool.extraFlags];
     if (this.sessionId && this.tool.resumeFlag) {
       cmd.push(this.tool.resumeFlag, this.sessionId);
+    }
+    // 두 번째 메시지부터 이전 세션 이어가기 (e.g. opencode -c)
+    if (this.messageCount > 0 && this.tool.continueFlag) {
+      cmd.push(this.tool.continueFlag);
     }
     return cmd;
   }
