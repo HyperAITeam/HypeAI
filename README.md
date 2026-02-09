@@ -1,6 +1,10 @@
 # AI CLI Gateway Bot
 
+> [English](README_EN.md)
+
 Discord 메시지로 PC에 설치된 AI CLI 도구(Claude Code, Gemini CLI, OpenCode)를 원격 제어하는 봇.
+
+![ScreenShot](ScreenShot.gif)
 
 ## 요구 사항
 
