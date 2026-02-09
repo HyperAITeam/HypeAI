@@ -54,9 +54,10 @@ export const CLI_TOOLS: Record<string, CliTool> = {
     name: "Gemini CLI",
     rulesFile: "GEMINI.md",
     extraFlags: ["--yolo"],
-    resumeFlag: null,
-    jsonOutput: false,
+    resumeFlag: "--resume",
+    jsonOutput: true,
     useAgentSdk: false,
+    useStreamJson: true,
   },
   opencode: {
     command: "opencode",

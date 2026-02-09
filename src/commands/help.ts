@@ -29,6 +29,7 @@ const helpCommand: PrefixCommand = {
             `\`${p}session info\` — Show session status (alias: \`${p}s\`)`,
             `\`${p}session new\` — Start a fresh conversation`,
             `\`${p}session kill\` — Kill running CLI process (alias: \`${p}s stop\`)`,
+            `\`${p}session switch <cli>\` — Switch CLI tool (alias: \`${p}s sw\`)`,
           ].join("\n"),
           inline: false,
         },

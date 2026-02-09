@@ -36,6 +36,8 @@ export interface CliTool {
   jsonOutput: boolean;
   /** true = use Agent SDK instead of subprocess */
   useAgentSdk: boolean;
+  /** true = use stream-json output format (Gemini CLI) */
+  useStreamJson?: boolean;
 }
 
 // --- Session manager interface ---

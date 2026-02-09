@@ -14,7 +14,9 @@ import type { BotClient, PrefixCommand, CommandContext } from "./types.js";
 import type { ISessionManager } from "./sessions/types.js";
 import { ClaudeSessionManager } from "./sessions/claude.js";
 import { SubprocessSessionManager } from "./sessions/subprocess.js";
+import { GeminiSessionManager } from "./sessions/gemini.js";
 import { setSession } from "./commands/ask.js";
+import { initSessionCache, getAllCachedSessions } from "./commands/session.js";
 
 // ── Static command imports (for .exe bundling) ──────────────────────
 import askCommand from "./commands/ask.js";
@@ -262,12 +264,21 @@ function checkClaudePrerequisites(): void {
 
 // ── Create session manager ───────────────────────────────────────────
 
-function createSession(cliName: string, cwd: string): ISessionManager {
+export function createSession(cliName: string, cwd: string): ISessionManager {
   const tool = CLI_TOOLS[cliName];
+
+  // Claude: Agent SDK
   if (tool.useAgentSdk) {
     checkClaudePrerequisites();
     return new ClaudeSessionManager(tool, cwd);
   }
+
+  // Gemini: Stream JSON with session resume
+  if (tool.useStreamJson) {
+    return new GeminiSessionManager(tool, cwd);
+  }
+
+  // Others (OpenCode, etc.): Basic subprocess
   return new SubprocessSessionManager(cliName, tool, cwd);
 }
 
@@ -296,9 +307,10 @@ async function main(): Promise<void> {
   client.selectedCli = cliName;
   client.workingDir = workingDir;
 
-  // Create session & share with ask command
+  // Create session & share with ask command + register in cache
   const session = createSession(cliName, workingDir);
   setSession(session);
+  initSessionCache(cliName, session);
 
   // Load commands
   loadCommands(client);
@@ -338,10 +350,11 @@ async function main(): Promise<void> {
     }
   });
 
-  // Graceful shutdown
+  // Graceful shutdown - cleanup all cached sessions
   const shutdown = async () => {
     console.log("\n  Shutting down...");
-    await session.cleanup();
+    const allSessions = getAllCachedSessions();
+    await Promise.all(allSessions.map((s) => s.cleanup()));
     client.destroy();
     process.exit(0);
   };
