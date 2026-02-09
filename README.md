@@ -1,250 +1,263 @@
+<div align="center">
+
 # AI CLI Gateway Bot
 
-> [English](README_EN.md)
+### 잠든 사이에도 AI가 코딩한다
 
-Discord 메시지로 PC에 설치된 AI CLI 도구(Claude Code, Gemini CLI, OpenCode)를 원격 제어하는 봇.
+Discord에서 PC의 AI CLI 도구를 원격 제어하세요
 
-![ScreenShot](ScreenShot.gif)
+[![GitHub release](https://img.shields.io/github/v/release/OsgoodYZ/osgoodAI?style=flat-square)](../../releases/latest)
+[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen?style=flat-square)](https://nodejs.org/)
+[![Discord.js](https://img.shields.io/badge/discord.js-v14-5865F2?style=flat-square)](https://discord.js.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square)](https://www.typescriptlang.org/)
 
-## 요구 사항
+[English](README_EN.md) · [버그 리포트](../../issues/new) · [기능 요청](../../issues/new)
 
-- **Node.js** v18 이상 ([다운로드](https://nodejs.org/))
-- **Discord Bot Token** ([Discord Developer Portal](https://discord.com/developers/applications)에서 생성)
-- AI CLI 도구 중 하나 이상 설치:
-  - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — `npm install -g @anthropic-ai/claude-code`
-  - [Gemini CLI](https://github.com/google-gemini/gemini-cli) — `npm install -g @anthropic-ai/gemini-cli`
-  - [OpenCode](https://opencode.ai/)
+<br>
 
-## 사전 준비: Discord 봇 만들기
+![Demo](ScreenShot.gif)
 
-봇을 사용하려면 먼저 Discord 봇을 만들어야 합니다:
+</div>
 
-1. [Discord Developer Portal](https://discord.com/developers/applications) 접속 → **New Application** → 이름 입력 → 생성
-2. **Bot** 탭 → **Reset Token** → 토큰 복사 (나중에 입력합니다)
-3. **Bot** 탭 → **Privileged Gateway Intents**에서 **Message Content Intent** 켜기 (필수!)
-4. **OAuth2** → **URL Generator** → Scopes: `bot` 체크 → Permissions: `Send Messages`, `Read Message History`, `Attach Files` 체크 → 생성된 URL을 브라우저에서 열어 서버에 초대
+---
 
-> 토큰은 비밀번호와 같습니다. 절대 공유하지 마세요!
+## ✨ 주요 기능
 
-## 설치 & 실행
+<table>
+<tr>
+<td width="50%">
 
-### 방법 1: exe 파일 (권장)
+### 🤖 AI 원격 제어
+Discord 메시지로 Claude Code, Gemini CLI, OpenCode를 원격으로 조작
 
-빌드된 `.exe` 파일로 간편하게 실행할 수 있습니다.
+</td>
+<td width="50%">
 
-> **사전 요구**: Claude Code를 사용하려면 **Node.js v18+**이 설치되어 있어야 합니다.
-> Agent SDK가 내부적으로 Node.js를 사용하여 Claude Code를 실행합니다.
-> 또한 Claude Code 인증이 필요합니다 (`claude login` 또는 `ANTHROPIC_API_KEY` 환경변수).
+### 💬 인터랙티브 응답
+Claude가 물어보면 Discord 버튼으로 바로 응답
 
-1. [GitHub Releases](../../releases/latest)에서 `aidevelop-bot.exe`, `cli.js`, `.env.example` 다운로드
-2. **세 파일을 같은 폴더에 배치** (`cli.js`가 없으면 Claude Code 사용 불가!)
-3. `aidevelop-bot.exe` 더블클릭하여 실행
-3. 첫 실행 시 자동으로 설정 화면이 표시됩니다:
+</td>
+</tr>
+<tr>
+<td width="50%">
 
+### 🔒 보안 설계
+화이트리스트 기반 접근 제어 + 위험 명령어 차단
+
+</td>
+<td width="50%">
+
+### 📦 원클릭 실행
+exe 파일 더블클릭으로 바로 시작
+
+</td>
+</tr>
+</table>
+
+---
+
+## ⚡ 빠른 시작
+
+### 1️⃣ 다운로드
+[GitHub Releases](../../releases/latest)에서 `aidevelop-bot.exe`, `cli.js`, `.env.example` 다운로드
+
+### 2️⃣ 실행
+`aidevelop-bot.exe` 더블클릭 → 봇 토큰 & 유저 ID 입력
+
+### 3️⃣ 사용
+Discord에서 `!ask 코드 리뷰해줘` 입력!
+
+> 💡 **사전 준비**: [Discord 봇 만들기](#discord-봇-만들기) 섹션 참고
+
+---
+
+## 📋 명령어
+
+| 명령어 | 별칭 | 설명 |
+|:-------|:-----|:-----|
+| `!ask <메시지>` | `!a` | AI에게 메시지 전송 |
+| `!session info` | `!s` | 현재 세션 상태 확인 |
+| `!session new` | `!s new` | 새 대화 시작 |
+| `!session kill` | `!s stop` | 진행 중인 AI 중단 |
+| `!exec <명령어>` | `!run`, `!cmd` | CMD 명령어 실행 |
+| `!status` | `!sysinfo` | 시스템 정보 |
+| `!myid` | `!id` | Discord ID 확인 |
+| `!help` | | 도움말 |
+
+---
+
+## 🤖 지원 AI 도구
+
+| 도구 | 연동 방식 | 인터랙티브 | 세션 유지 |
+|:-----|:---------|:----------:|:---------:|
+| **Claude Code** | Agent SDK | ✅ | ✅ |
+| **Gemini CLI** | subprocess | ❌ | ❌ |
+| **OpenCode** | subprocess | ❌ | ❌ |
+
+> **Claude Code**는 Agent SDK를 통해 직접 통신합니다. AI가 선택지를 물어보면 Discord 버튼으로 응답할 수 있어요!
+
+---
+
+## 📦 설치 방법
+
+<details>
+<summary><b>방법 1: exe 파일 (권장)</b></summary>
+
+### 사전 요구
+- **Node.js v18+** (Claude Code 사용 시 필수)
+- Claude Code 인증 (`claude login` 또는 `ANTHROPIC_API_KEY`)
+
+### 설치
+1. [Releases](../../releases/latest)에서 3개 파일 다운로드
+2. **같은 폴더에 배치** (`cli.js` 없으면 Claude Code 사용 불가!)
+3. `aidevelop-bot.exe` 더블클릭
+
+### 첫 실행 화면
 ```
 ================================================
   초기 설정 — .env 파일 생성
 ================================================
 
-  .env 파일이 없습니다. 필수 정보를 입력해주세요.
-
-  [1/2] Discord 봇 토큰: (위에서 복사한 토큰 붙여넣기)
-  [2/2] Discord 유저 ID: (내 Discord ID 입력)
+  [1/2] Discord 봇 토큰: ████████████████████
+  [2/2] Discord 유저 ID: 123456789012345678
 
   .env 파일이 생성되었습니다!
 ```
 
-4. `.env.example`을 `.env`로 복사 후 값 입력 (또는 첫 실행 시 자동 설정)
-5. 이어서 AI CLI 도구 선택 → 작업 폴더 입력 → 봇 시작
+</details>
 
-> **Discord 유저 ID 확인 방법**: Discord 설정 → 고급 → 개발자 모드 켜기 → 내 프로필 우클릭 → ID 복사.
-> 또는 봇 실행 후 `!myid` 입력하면 알려줍니다.
+<details>
+<summary><b>방법 2: 배치 파일 (Windows)</b></summary>
 
-### 방법 2: 배치 파일 (Windows — Node.js 필요)
+```bash
+# 1. 초기 설정
+setup.bat
 
-`setup.bat` 더블클릭 — Node.js 확인, 의존성 설치, `.env` 파일 생성까지 자동으로 진행.
+# 2. 봇 실행
+start_bot.bat
+```
 
-실행: `start_bot.bat` 더블클릭
+</details>
 
-### 방법 3: 수동 설치 (Node.js 필요)
+<details>
+<summary><b>방법 3: 수동 설치 (Node.js)</b></summary>
 
 ```bash
 npm install
 npx tsx src/bot.ts
 ```
 
-> `.env` 파일이 없으면 첫 실행 시 자동으로 설정 화면이 표시됩니다.
-> 수동으로 만들려면 `.env.example`을 `.env`로 복사 후 값을 입력하세요.
+</details>
 
-## 실행 흐름
+---
 
-봇을 실행하면 콘솔에서 두 가지를 선택합니다:
+## ⚙️ 설정
 
-```
-[1/2] Select AI CLI tool:
-    1) Claude Code  (claude)
-    2) Gemini CLI   (gemini)
-    3) OpenCode     (opencode)
-
-[2/2] Enter working directory:
-    Path (default: C:\현재경로):
-```
-
-- **AI CLI 도구** — 어떤 AI를 사용할지 선택
-- **작업 디렉토리** — AI가 코드를 읽고 수정할 폴더 경로
-
-선택 완료 후 봇이 Discord에 접속합니다.
-
-## 명령어
-
-| 명령어 | 별칭 | 설명 |
-|--------|------|------|
-| `!ask <메시지>` | `!a` | AI에게 메시지 전송 |
-| `!session info` | `!s` | 현재 세션 상태 확인 |
-| `!session new` | `!s new` | 새 대화 시작 (세션 초기화) |
-| `!session kill` | `!s stop` | 진행 중인 AI 프로세스 중단 |
-| `!exec <명령어>` | `!run`, `!cmd` | CMD 명령어 실행 |
-| `!status` | `!sysinfo` | 시스템 정보 표시 |
-| `!myid` | `!id` | 내 Discord User ID 확인 |
-| `!help` | | 도움말 표시 |
-
-## 사용 예시
-
-### AI에게 질문하기
-
-```
-!ask 이 프로젝트의 구조를 설명해줘
-```
-
-```
-!a src/index.ts 파일에 에러 핸들링 추가해줘
-```
-
-### AI가 선택지를 물어볼 때 (Claude Code)
-
-Claude가 작업 중 선택이 필요하면 Discord에 버튼이 나타납니다:
-
-```
-Claude가 질문합니다:
-"어떤 방식으로 리팩토링할까요?"
-
-[파일 분리] [함수 추출] [클래스 전환]  ← 버튼 클릭으로 응답
-```
-
-60초 내에 선택하지 않으면 첫 번째 옵션이 자동 선택됩니다.
-
-### 세션 관리
-
-```
-!session info     ← 현재 상태 확인
-!session new      ← 새 대화 시작
-!session kill     ← 오래 걸리는 작업 중단
-```
-
-### CMD 명령어 실행
-
-```
-!exec dir
-!run git status
-!cmd npm test
-```
-
-## 설정 (.env)
+### 환경 변수 (.env)
 
 | 변수 | 필수 | 기본값 | 설명 |
-|------|------|--------|------|
-| `DISCORD_BOT_TOKEN` | O | — | Discord 봇 토큰 |
-| `ALLOWED_USER_IDS` | O | — | 허용할 유저 ID (쉼표로 여러 명 가능) |
-| `ANTHROPIC_API_KEY` | X | — | Anthropic API 키 (`claude login` 사용 시 불필요) |
-| `COMMAND_PREFIX` | X | `!` | 명령어 접두사 |
-| `COMMAND_TIMEOUT` | X | `30` | CMD 명령어 타임아웃 (초) |
-| `AI_CLI_TIMEOUT` | X | `300` | AI CLI 타임아웃 (초) |
+|:-----|:----:|:------:|:-----|
+| `DISCORD_BOT_TOKEN` | ✅ | — | Discord 봇 토큰 |
+| `ALLOWED_USER_IDS` | ✅ | — | 허용할 유저 ID (쉼표 구분) |
+| `ANTHROPIC_API_KEY` | ❌ | — | API 키 (`claude login` 시 불필요) |
+| `COMMAND_PREFIX` | ❌ | `!` | 명령어 접두사 |
+| `COMMAND_TIMEOUT` | ❌ | `30` | CMD 타임아웃 (초) |
+| `AI_CLI_TIMEOUT` | ❌ | `300` | AI 타임아웃 (초) |
 
 ### 여러 유저 허용
 
-```
+```env
 ALLOWED_USER_IDS=111111111111111111,222222222222222222
 ```
 
-## Discord 봇 생성 방법
+---
+
+## 🔧 Discord 봇 만들기
+
+<details>
+<summary><b>상세 가이드 펼치기</b></summary>
 
 1. [Discord Developer Portal](https://discord.com/developers/applications) 접속
 2. **New Application** → 이름 입력 → 생성
-3. **Bot** 탭 → **Reset Token** → 토큰 복사 → `.env`에 붙여넣기
-4. **Bot** 탭 → **Privileged Gateway Intents** 에서 아래 3개 활성화:
-   - Presence Intent
-   - Server Members Intent
-   - **Message Content Intent** (필수)
-5. **OAuth2** → **URL Generator** → Scopes: `bot` → Permissions: `Send Messages`, `Read Message History`, `Attach Files` → 생성된 URL로 서버에 초대
+3. **Bot** 탭 → **Reset Token** → 토큰 복사
+4. **Bot** 탭 → **Privileged Gateway Intents**:
+   - ✅ Presence Intent
+   - ✅ Server Members Intent
+   - ✅ **Message Content Intent** (필수!)
+5. **OAuth2** → **URL Generator**:
+   - Scopes: `bot`
+   - Permissions: `Send Messages`, `Read Message History`, `Attach Files`
+6. 생성된 URL로 서버에 봇 초대
 
-## 지원 CLI 도구
+> ⚠️ **토큰은 비밀번호입니다. 절대 공유하지 마세요!**
 
-| 도구 | 방식 | TUI 응답 | 세션 유지 |
-|------|------|----------|-----------|
-| Claude Code | Agent SDK | O (Discord 버튼) | O (resume) |
-| Gemini CLI | subprocess | X | X |
-| OpenCode | subprocess | X | X |
+</details>
 
-- **Claude Code**: Agent SDK를 통해 직접 통신. AI가 질문하면 Discord 버튼으로 응답 가능.
-- **Gemini CLI / OpenCode**: 서브프로세스로 실행. `-p "메시지"` 형태로 전달하고 출력을 수집.
+---
 
-## exe 빌드 (배포용)
+## 🛠️ 문제 해결
 
-[Bun](https://bun.sh/)을 사용해 `.exe` 파일로 빌드합니다.
+<details>
+<summary><b>자주 묻는 문제</b></summary>
 
-> **참고**: Claude Code 사용 시 받는 사람의 PC에도 **Node.js v18+** 설치와 Claude Code 인증(`claude login` 또는 `ANTHROPIC_API_KEY`)이 필요합니다.
+| 증상 | 해결 |
+|:-----|:-----|
+| `cli.js 파일을 찾을 수 없습니다` | exe와 같은 폴더에 `cli.js` 배치 |
+| `Node.js가 설치되어 있지 않습니다` | [Node.js v18+](https://nodejs.org/) 설치 |
+| Claude 인증 에러 | `claude login` 실행 또는 API 키 설정 |
+| `You are not authorized` | `!myid`로 ID 확인 → `.env`에 추가 |
+| 봇이 반응 없음 | **Message Content Intent** 활성화 확인 |
 
-### 빌드 방법
+</details>
 
+---
+
+## 🏗️ 빌드 (개발자용)
+
+<details>
+<summary><b>exe 빌드 방법</b></summary>
+
+### 사전 요구
+- [Bun](https://bun.sh/) 설치: `npm install -g bun`
+
+### 빌드
 ```bash
-# 방법 1: 배치 파일
+# 방법 1
 build.bat
 
-# 방법 2: npm 스크립트 (Bun 필요)
+# 방법 2
 npm run build:exe
 ```
 
-### 빌드 결과
-
+### 결과물
 ```
 dist/
 ├── aidevelop-bot.exe    ← 실행파일
-├── cli.js               ← Claude Agent SDK 런타임 (exe와 반드시 같은 폴더)
+├── cli.js               ← Agent SDK 런타임
 └── .env.example         ← 설정 템플릿
 ```
 
-### 사전 요구
+</details>
 
-- [Bun](https://bun.sh/) 설치 — `npm install -g bun`
+---
 
-## 문제 해결
+## 🤝 기여하기
 
-| 증상 | 해결 |
-|------|------|
-| `cli.js 파일을 찾을 수 없습니다` | exe와 같은 폴더에 `cli.js` 파일이 있는지 확인. Release에서 함께 다운로드 |
-| `Node.js가 설치되어 있지 않습니다` | [Node.js](https://nodejs.org/) v18+ 설치 필요 (Claude Code Agent SDK 실행에 필수) |
-| Claude 인증 에러 | `claude login`으로 로그인하거나 `ANTHROPIC_API_KEY` 환경변수 설정 |
-| `You are not authorized` | `!myid`로 ID 확인 → `.env`의 `ALLOWED_USER_IDS`에 입력 → 봇 재시작 |
-| `is not installed or not in PATH` | 해당 CLI 도구가 설치되어 있는지 확인 |
-| 봇이 아무 반응 없음 | Discord Developer Portal에서 **Message Content Intent** 활성화했는지 확인 |
-| 응답이 너무 길어서 잘림 | 2000자 초과 시 자동으로 `.txt` 파일로 첨부됨 |
+기여를 환영합니다! [CONTRIBUTING.md](CONTRIBUTING.md)를 확인해주세요.
 
-## 개발자 참고
+---
 
-### Git Hooks 설정 (권장)
+## 📄 라이선스
 
-`.env` 파일 실수로 커밋하는 걸 방지하는 pre-commit hook이 포함되어 있습니다.
+[MIT](LICENSE) © 2024
 
-```bash
-# Windows
-setup-hooks.bat
+---
 
-# 또는 수동 설정
-git config core.hooksPath .husky
-```
+<div align="center">
 
-설정 후 `.env` 파일을 커밋하려고 하면 자동으로 차단됩니다.
+**Discord로 어디서든 AI와 코딩하세요** 🚀
 
-## License
+[⬆ 맨 위로](#ai-cli-gateway-bot)
 
-[MIT](LICENSE)
+</div>
