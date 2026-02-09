@@ -30,7 +30,7 @@ Discord 메시지로 PC에 설치된 AI CLI 도구(Claude Code, Gemini CLI, Open
 
 > **사전 요구**: Claude Code를 사용하려면 **Node.js v18+**이 설치되어 있어야 합니다.
 > Agent SDK가 내부적으로 Node.js를 사용하여 Claude Code를 실행합니다.
-> 또한 **ANTHROPIC_API_KEY** 환경변수가 설정되어 있어야 합니다.
+> 또한 Claude Code 인증이 필요합니다 (`claude login` 또는 `ANTHROPIC_API_KEY` 환경변수).
 
 1. [GitHub Releases](../../releases/latest)에서 `aidevelop-bot.exe`, `cli.js`, `.env.example` 다운로드
 2. **세 파일을 같은 폴더에 배치** (`cli.js`가 없으면 Claude Code 사용 불가!)
@@ -151,7 +151,7 @@ Claude가 질문합니다:
 |------|------|--------|------|
 | `DISCORD_BOT_TOKEN` | O | — | Discord 봇 토큰 |
 | `ALLOWED_USER_IDS` | O | — | 허용할 유저 ID (쉼표로 여러 명 가능) |
-| `ANTHROPIC_API_KEY` | Claude 사용 시 | — | Anthropic API 키 (.env 또는 시스템 환경변수) |
+| `ANTHROPIC_API_KEY` | X | — | Anthropic API 키 (`claude login` 사용 시 불필요) |
 | `COMMAND_PREFIX` | X | `!` | 명령어 접두사 |
 | `COMMAND_TIMEOUT` | X | `30` | CMD 명령어 타임아웃 (초) |
 | `AI_CLI_TIMEOUT` | X | `300` | AI CLI 타임아웃 (초) |
@@ -188,7 +188,7 @@ ALLOWED_USER_IDS=111111111111111111,222222222222222222
 
 [Bun](https://bun.sh/)을 사용해 `.exe` 파일로 빌드합니다.
 
-> **참고**: Claude Code 사용 시 받는 사람의 PC에도 **Node.js v18+** 설치와 **ANTHROPIC_API_KEY** 환경변수 설정이 필요합니다.
+> **참고**: Claude Code 사용 시 받는 사람의 PC에도 **Node.js v18+** 설치와 Claude Code 인증(`claude login` 또는 `ANTHROPIC_API_KEY`)이 필요합니다.
 
 ### 빌드 방법
 
@@ -219,7 +219,7 @@ dist/
 |------|------|
 | `cli.js 파일을 찾을 수 없습니다` | exe와 같은 폴더에 `cli.js` 파일이 있는지 확인. Release에서 함께 다운로드 |
 | `Node.js가 설치되어 있지 않습니다` | [Node.js](https://nodejs.org/) v18+ 설치 필요 (Claude Code Agent SDK 실행에 필수) |
-| `ANTHROPIC_API_KEY` 경고 | Anthropic API 키를 `.env` 또는 시스템 환경변수에 설정 |
+| Claude 인증 에러 | `claude login`으로 로그인하거나 `ANTHROPIC_API_KEY` 환경변수 설정 |
 | `You are not authorized` | `!myid`로 ID 확인 → `.env`의 `ALLOWED_USER_IDS`에 입력 → 봇 재시작 |
 | `is not installed or not in PATH` | 해당 CLI 도구가 설치되어 있는지 확인 |
 | 봇이 아무 반응 없음 | Discord Developer Portal에서 **Message Content Intent** 활성화했는지 확인 |

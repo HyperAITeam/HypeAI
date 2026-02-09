@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
+import { execSync } from "node:child_process";
 import {
   Client,
   Collection,
@@ -213,8 +214,6 @@ function loadCommands(client: BotClient): void {
 // ── Prerequisites check ─────────────────────────────────────────────
 
 function checkClaudePrerequisites(): void {
-  const { execSync } = require("node:child_process");
-
   // 1) cli.js 존재 확인
   const exeDir = path.dirname(process.execPath);
   const cliInExeDir = path.join(exeDir, "cli.js");
@@ -256,14 +255,9 @@ function checkClaudePrerequisites(): void {
     process.exit(1);
   }
 
-  // 3) ANTHROPIC_API_KEY 확인
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.error();
-    console.error("  [WARNING] ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다.");
-    console.error("  Claude Code 사용 시 API 키가 필요합니다.");
-    console.error("  .env 파일 또는 시스템 환경변수에 설정해주세요.");
-    console.error();
-  }
+  // Claude Code는 ANTHROPIC_API_KEY 환경변수 외에도
+  // `claude login`으로 저장된 credential로 인증 가능하므로
+  // API 키 유무를 여기서 체크하지 않는다.
 }
 
 // ── Create session manager ───────────────────────────────────────────

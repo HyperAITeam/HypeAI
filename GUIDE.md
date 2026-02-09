@@ -45,15 +45,15 @@ Discord 메시지를 통해 내 Windows PC에서 실행 중인 AI CLI 도구(Cla
 
 | 항목 | 설명 |
 |------|------|
-| **ANTHROPIC_API_KEY** | Anthropic API 키. `.env` 파일 또는 시스템 환경변수에 설정 |
+| **Claude Code 인증** | `claude login`으로 로그인 또는 `ANTHROPIC_API_KEY` 환경변수 설정 |
 | **cli.js** | Agent SDK 런타임 파일. exe 실행 시 exe와 같은 폴더에 있어야 함 |
 
 ```bash
-# API 키 설정 (시스템 환경변수)
-set ANTHROPIC_API_KEY=sk-ant-xxxxx
+# 방법 1: claude login (권장 — 브라우저에서 인증)
+claude login
 
-# 또는 .env 파일에 추가
-echo ANTHROPIC_API_KEY=sk-ant-xxxxx >> .env
+# 방법 2: API 키 직접 설정
+set ANTHROPIC_API_KEY=sk-ant-xxxxx
 ```
 
 ### AI CLI 도구 설치 확인
@@ -148,8 +148,8 @@ DISCORD_BOT_TOKEN=여기에_봇_토큰_붙여넣기
 # [필수] 허가된 Discord 유저 ID (여러 명이면 쉼표로 구분)
 ALLOWED_USER_IDS=123456789012345678
 
-# [Claude 사용 시 필수] Anthropic API 키 (시스템 환경변수로도 설정 가능)
-ANTHROPIC_API_KEY=sk-ant-xxxxx
+# [선택] Anthropic API 키 (claude login 사용 시 불필요)
+# ANTHROPIC_API_KEY=sk-ant-xxxxx
 
 # [선택] 명령어 접두사 (기본: !)
 COMMAND_PREFIX=!
@@ -167,7 +167,7 @@ AI_CLI_TIMEOUT=300
 |------|:----:|--------|------|
 | `DISCORD_BOT_TOKEN` | O | — | Discord 봇 토큰 |
 | `ALLOWED_USER_IDS` | O | — | 봇 사용 허가 유저 ID (쉼표 구분) |
-| `ANTHROPIC_API_KEY` | Claude 사용 시 | — | Anthropic API 키 (시스템 환경변수로도 설정 가능) |
+| `ANTHROPIC_API_KEY` | | — | Anthropic API 키 (`claude login` 사용 시 불필요) |
 | `COMMAND_PREFIX` | | `!` | 명령어 접두사 |
 | `COMMAND_TIMEOUT` | | `30` | `!exec` 명령 타임아웃 (초) |
 | `AI_CLI_TIMEOUT` | | `300` | AI CLI 응답 타임아웃 (초) |
@@ -562,18 +562,17 @@ net user, net localgroup
 - https://nodejs.org/ 에서 설치 후 새 CMD 창에서 exe를 다시 실행하세요
 - `node --version`으로 정상 설치 확인
 
-### Q: "ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다" 경고
-- Claude Code 사용 시 Anthropic API 키가 필요합니다
-- 설정 방법 (택 1):
-  - `.env` 파일에 `ANTHROPIC_API_KEY=sk-ant-xxxxx` 추가
-  - Windows 시스템 환경변수에 `ANTHROPIC_API_KEY` 등록
+### Q: Claude Code 인증은 어떻게 하나요?
+- 방법 1: `claude login` 실행 → 브라우저에서 인증 (권장, 환경변수 불필요)
+- 방법 2: `ANTHROPIC_API_KEY` 환경변수 설정 (`.env` 또는 시스템 환경변수)
+- 둘 중 하나만 되어 있으면 됩니다
 
 ### Q: exe만 있으면 아무것도 설치 안 해도 되나요?
 - **아닙니다.** exe는 Discord 봇 부분만 포함합니다
 - Claude Code 사용 시 필요한 것:
   1. `cli.js` — exe와 같은 폴더에 배치
   2. **Node.js v18+** — 시스템에 설치
-  3. **ANTHROPIC_API_KEY** — 환경변수 설정
+  3. **Claude Code 인증** — `claude login` 또는 `ANTHROPIC_API_KEY`
 - Gemini CLI / OpenCode 사용 시에는 해당 CLI가 전역 설치되어 있어야 합니다
 
 ### Q: 봇이 응답하지 않아요
@@ -888,7 +887,7 @@ build.bat            # 배치 파일 (dist/ 생성 + cli.js 복사 + .env.exampl
 | 항목 | 필요 여부 | 설명 |
 |------|-----------|------|
 | **Node.js v18+** | Claude Code 사용 시 필수 | Agent SDK가 `node cli.js`를 subprocess로 실행 |
-| **ANTHROPIC_API_KEY** | Claude Code 사용 시 필수 | Anthropic API 인증용 환경변수 |
+| **Claude Code 인증** | Claude Code 사용 시 필수 | `claude login` 또는 `ANTHROPIC_API_KEY` 환경변수 |
 | **cli.js** | Claude Code 사용 시 필수 | exe와 같은 폴더에 배치해야 함 |
 
 #### Bun을 사용하는 이유
