@@ -1,6 +1,7 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import path from "node:path";
 import fs from "node:fs";
+import { spawn } from "node:child_process";
 import type { Message, TextChannel } from "discord.js";
 import type { ISessionManager, SessionInfo } from "./types.js";
 import type { CliTool } from "../types.js";
@@ -72,8 +73,36 @@ export class ClaudeSessionManager implements ISessionManager {
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
         abortController: this.abortController,
+        executable: "node" as const,
         ...(cliPath && { pathToClaudeCodeExecutable: cliPath }),
         stderr: (data: string) => console.error("[Claude stderr]", data),
+        // Bun exe의 child_process.spawn은 signal 옵션을 제대로 처리 못함.
+        // 직접 spawn해서 abort는 수동으로 처리한다.
+        spawnClaudeCodeProcess: (spawnOpts: {
+          command: string;
+          args: string[];
+          cwd?: string;
+          env: Record<string, string | undefined>;
+          signal: AbortSignal;
+        }) => {
+          console.log(`  [Claude] spawn: ${spawnOpts.command} ${spawnOpts.args[0] ?? ""}`);
+          const proc = spawn(spawnOpts.command, spawnOpts.args, {
+            cwd: spawnOpts.cwd,
+            env: spawnOpts.env as NodeJS.ProcessEnv,
+            stdio: ["pipe", "pipe", "pipe"],
+            windowsHide: true,
+          });
+          proc.on("error", (err) => console.error("  [Claude] spawn error:", err.message));
+          proc.on("exit", (code, sig) => console.log(`  [Claude] exit: code=${code} signal=${sig}`));
+          proc.stderr?.on("data", (d: Buffer) => console.error("  [Claude] stderr:", d.toString()));
+
+          // signal → 수동 kill
+          const onAbort = () => { try { proc.kill(); } catch {} };
+          spawnOpts.signal.addEventListener("abort", onAbort, { once: true });
+          proc.on("exit", () => spawnOpts.signal.removeEventListener("abort", onAbort));
+
+          return proc;
+        },
         canUseTool: async (
           toolName: string,
           input: Record<string, unknown>,
