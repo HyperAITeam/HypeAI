@@ -25,10 +25,14 @@ const helpCommand: PrefixCommand = {
         {
           name: "AI CLI",
           value: [
-            `\`${p}ask <message>\` — Send message to ${tool.name} (alias: \`${p}a\`)`,
-            `\`${p}session info\` — Show session status (alias: \`${p}s\`)`,
-            `\`${p}session new\` — Start a fresh conversation`,
-            `\`${p}session kill\` — Kill running CLI process (alias: \`${p}s stop\`)`,
+            `\`${p}ask [session] <message>\` — Send message (alias: \`${p}a\`)`,
+            `\`${p}session create <name> [cli]\` — Create a new session (alias: \`${p}s c\`)`,
+            `\`${p}session list\` — List all sessions (alias: \`${p}s ls\`)`,
+            `\`${p}session switch <name>\` — Switch active session (alias: \`${p}s sw\`)`,
+            `\`${p}session info [name]\` — Show session info (alias: \`${p}s\`)`,
+            `\`${p}session new [name]\` — Reset session conversation`,
+            `\`${p}session kill [name]\` — Kill session process (alias: \`${p}s stop\`)`,
+            `\`${p}session delete <name>\` — Delete session (alias: \`${p}s rm\`)`,
           ].join("\n"),
           inline: false,
         },

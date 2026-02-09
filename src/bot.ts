@@ -14,7 +14,11 @@ import type { BotClient, PrefixCommand, CommandContext } from "./types.js";
 import type { ISessionManager } from "./sessions/types.js";
 import { ClaudeSessionManager } from "./sessions/claude.js";
 import { SubprocessSessionManager } from "./sessions/subprocess.js";
-import { setSession } from "./commands/ask.js";
+import {
+  MultiSessionManager,
+  setMultiSessionManager,
+  getMultiSessionManager,
+} from "./sessions/multiSession.js";
 
 // ── Static command imports (for .exe bundling) ──────────────────────
 import askCommand from "./commands/ask.js";
@@ -262,7 +266,7 @@ function checkClaudePrerequisites(): void {
 
 // ── Create session manager ───────────────────────────────────────────
 
-function createSession(cliName: string, cwd: string): ISessionManager {
+export function createSession(cliName: string, cwd: string): ISessionManager {
   const tool = CLI_TOOLS[cliName];
   if (tool.useAgentSdk) {
     checkClaudePrerequisites();
@@ -296,9 +300,9 @@ async function main(): Promise<void> {
   client.selectedCli = cliName;
   client.workingDir = workingDir;
 
-  // Create session & share with ask command
-  const session = createSession(cliName, workingDir);
-  setSession(session);
+  // Create multi-session manager
+  const multiSession = new MultiSessionManager(workingDir);
+  setMultiSessionManager(multiSession);
 
   // Load commands
   loadCommands(client);
@@ -338,10 +342,13 @@ async function main(): Promise<void> {
     }
   });
 
-  // Graceful shutdown
+  // Graceful shutdown - cleanup all sessions
   const shutdown = async () => {
     console.log("\n  Shutting down...");
-    await session.cleanup();
+    const multiSessionMgr = getMultiSessionManager();
+    if (multiSessionMgr) {
+      await multiSessionMgr.cleanup();
+    }
     client.destroy();
     process.exit(0);
   };

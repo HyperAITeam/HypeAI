@@ -45,6 +45,7 @@ export interface CliTool {
 // --- Session manager interface ---
 
 export interface SessionInfo {
+  name?: string; // 멀티세션용 세션 이름
   cliName: string;
   toolName: string;
   cwd: string;
@@ -52,6 +53,16 @@ export interface SessionInfo {
   messageCount: number;
   startedAt: number;
   sessionId: string | null;
+}
+
+// --- Multi-session manager interface ---
+
+export interface NamedSession {
+  name: string; // 세션 이름 (예: "work", "default")
+  cliName: string; // CLI 도구 (예: "claude", "opencode")
+  manager: ISessionManager; // 실제 세션 매니저
+  createdAt: number; // 생성 시간
+  lastUsedAt: number; // 마지막 사용 시간
 }
 
 export interface ISessionManager {
