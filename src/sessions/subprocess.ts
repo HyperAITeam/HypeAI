@@ -34,9 +34,12 @@ export class SubprocessSessionManager implements ISessionManager {
     const shellCmd = cmd.map((a) => (a.includes(" ") ? `"${a}"` : a)).join(" ");
 
     return new Promise<string>((resolve) => {
+      console.log(`  [${this.cliName}] exec: ${shellCmd}`);
+      console.log(`  [${this.cliName}] cwd: ${this.cwd}`);
       const proc = spawn(shellCmd, {
         shell: true,
         cwd: this.cwd,
+        stdio: ["ignore", "pipe", "pipe"],
         windowsHide: true,
       });
       this.proc = proc;
@@ -52,6 +55,9 @@ export class SubprocessSessionManager implements ISessionManager {
 
         const stdout = Buffer.concat(chunks).toString("utf-8");
         const stderr = Buffer.concat(errChunks).toString("utf-8");
+
+        console.log(`  [${this.cliName}] exit: code=${code}`);
+        if (stderr.trim()) console.error(`  [${this.cliName}] stderr: ${stderr.trim().slice(0, 200)}`);
 
         if (code !== 0) {
           const err = stderr.trim() || stdout.trim() || "CLI exited with error";
@@ -69,6 +75,7 @@ export class SubprocessSessionManager implements ISessionManager {
       });
 
       proc.on("error", (err) => {
+        console.error(`  [${this.cliName}] spawn error: ${err.message}`);
         this.proc = null;
         if (err.message.includes("ENOENT")) {
           resolve(`[Error] \`${this.cliName}\` is not installed or not in PATH.`);
