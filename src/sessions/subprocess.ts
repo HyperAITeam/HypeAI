@@ -15,9 +15,6 @@ function stripAnsi(s: string): string {
  * if the tool defines a `resumeFlag` (currently only Claude, which uses
  * the Agent SDK instead).
  */
-/** 대화 히스토리 최대 길이 (characters) — 프롬프트에 주입할 때 */
-const MAX_HISTORY_CHARS = 4000;
-
 export class SubprocessSessionManager implements ISessionManager {
   private cliName: string;
   private tool: CliTool;
@@ -26,8 +23,6 @@ export class SubprocessSessionManager implements ISessionManager {
   private messageCount = 0;
   private startedAt = 0;
   private proc: ChildProcess | null = null;
-  /** continueFlag가 없는 도구용 대화 히스토리 (Gemini 등) */
-  private history: Array<{ role: "user" | "assistant"; content: string }> = [];
 
   constructor(cliName: string, tool: CliTool, cwd: string) {
     this.cliName = cliName;
@@ -42,25 +37,16 @@ export class SubprocessSessionManager implements ISessionManager {
   async sendMessage(message: string, _discordMessage: Message): Promise<string> {
     const cmd = this.buildCommand(message);
     const shellCmd = cmd.map((a) => (a.includes(" ") ? `"${a}"` : a)).join(" ");
-    const useStdinHistory = !this.tool.continueFlag && this.history.length > 0;
 
     return new Promise<string>((resolve) => {
       console.log(`  [${this.cliName}] exec: ${shellCmd}`);
       console.log(`  [${this.cliName}] cwd: ${this.cwd}`);
-      if (useStdinHistory) console.log(`  [${this.cliName}] piping ${this.history.length} history entries via stdin`);
       const proc = spawn(shellCmd, {
         shell: true,
         cwd: this.cwd,
-        stdio: [useStdinHistory ? "pipe" : "ignore", "pipe", "pipe"],
+        stdio: ["ignore", "pipe", "pipe"],
         windowsHide: true,
       });
-
-      // stdin으로 대화 히스토리 전달 (Gemini 등 continueFlag 없는 도구)
-      if (useStdinHistory && proc.stdin) {
-        const stdinText = this.buildStdinHistory();
-        proc.stdin.write(stdinText);
-        proc.stdin.end();
-      }
       this.proc = proc;
 
       const chunks: Buffer[] = [];
@@ -93,12 +79,6 @@ export class SubprocessSessionManager implements ISessionManager {
         const [result, newSid] = this.parseOutput(stdout);
         if (newSid) this.sessionId = newSid;
 
-        // continueFlag가 없는 도구는 히스토리로 세션 유지
-        if (!this.tool.continueFlag) {
-          this.history.push({ role: "user", content: message });
-          this.history.push({ role: "assistant", content: result.trim().slice(0, 1000) });
-        }
-
         this.messageCount++;
         if (this.startedAt === 0) this.startedAt = Date.now();
 
@@ -129,7 +109,6 @@ export class SubprocessSessionManager implements ISessionManager {
     this.sessionId = null;
     this.messageCount = 0;
     this.startedAt = 0;
-    this.history = [];
   }
 
   getInfo(): SessionInfo {
@@ -150,26 +129,6 @@ export class SubprocessSessionManager implements ISessionManager {
   }
 
   // --- internals ---
-
-  /**
-   * stdin으로 보낼 대화 히스토리 문자열 생성 (Gemini 등 continueFlag 없는 도구).
-   * Gemini CLI는 `-p` 플래그와 함께 stdin 입력을 앞에 붙여주므로,
-   * 대화 히스토리를 stdin으로 보내면 셸 이스케이프 문제 없이 세션이 유지된다.
-   */
-  private buildStdinHistory(): string {
-    const lines: string[] = [];
-    let len = 0;
-    for (let i = this.history.length - 1; i >= 0; i -= 2) {
-      const a = this.history[i];     // assistant
-      const u = this.history[i - 1]; // user
-      if (!u || !a) break;
-      const pair = `User: ${u.content}\nAssistant: ${a.content}`;
-      if (len + pair.length > MAX_HISTORY_CHARS) break;
-      lines.unshift(pair);
-      len += pair.length;
-    }
-    return lines.join("\n\n") + "\n";
-  }
 
   private buildCommand(message: string): string[] {
     const cmd = [this.tool.command, ...this.tool.promptArgs, message, ...this.tool.extraFlags];
