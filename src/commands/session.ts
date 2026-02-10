@@ -8,7 +8,7 @@ import { getMultiSessionManager } from "../sessions/multiSession.js";
 const sessionCommand: PrefixCommand = {
   name: "session",
   aliases: ["s"],
-  description: "Session management (info / create / list / delete / new / kill / switch).",
+  description: "Session management (info / create / list / delete / new / kill / switch / stats / history).",
 
   async execute(ctx: CommandContext): Promise<void> {
     if (!isAllowedUser(ctx.message.author.id)) {
@@ -37,6 +37,13 @@ const sessionCommand: PrefixCommand = {
       case "switch":
       case "sw":
         return handleSwitch(ctx);
+      case "stats":
+      case "stat":
+        return handleStats(ctx);
+      case "history":
+      case "hist":
+      case "h":
+        return handleHistory(ctx);
       case "info":
       default:
         return handleInfo(ctx);
@@ -263,6 +270,110 @@ async function handleSwitch(ctx: CommandContext): Promise<void> {
   if (info.sessionId) {
     embed.setFooter({ text: "Previous conversation context preserved." });
   }
+
+  await ctx.message.reply({ embeds: [embed] });
+}
+
+/**
+ * !session stats [name]
+ * 세션 토큰 통계 표시
+ */
+async function handleStats(ctx: CommandContext): Promise<void> {
+  const multiSession = getMultiSessionManager();
+  if (!multiSession) {
+    await ctx.message.reply("Session manager not initialized.");
+    return;
+  }
+
+  const name = ctx.args[1] ?? multiSession.getActiveSessionName();
+  const session = multiSession.getSession(name);
+
+  if (!session) {
+    await ctx.message.reply(`Session '${name}' not found.`);
+    return;
+  }
+
+  const stats = session.manager.getStats();
+  const info = session.manager.getInfo();
+  const tool = CLI_TOOLS[session.cliName];
+  const isActive = name === multiSession.getActiveSessionName();
+
+  const embed = new EmbedBuilder()
+    .setTitle(`Stats: ${name}${isActive ? " (active)" : ""}`)
+    .setColor(0xFEE75C)
+    .addFields(
+      { name: "CLI Tool", value: tool.name, inline: true },
+      { name: "Messages", value: String(info.messageCount), inline: true },
+      { name: "History Entries", value: String(stats.history.length), inline: true },
+      { name: "Input Tokens", value: stats.totalInputTokens.toLocaleString(), inline: true },
+      { name: "Output Tokens", value: stats.totalOutputTokens.toLocaleString(), inline: true },
+      { name: "Total Tokens", value: stats.totalTokens.toLocaleString(), inline: true },
+    )
+    .setFooter({ text: "Token counts are estimates (~4 chars = 1 token)" });
+
+  await ctx.message.reply({ embeds: [embed] });
+}
+
+/**
+ * !session history [name] [count]
+ * 세션 대화 히스토리 표시
+ */
+async function handleHistory(ctx: CommandContext): Promise<void> {
+  const multiSession = getMultiSessionManager();
+  if (!multiSession) {
+    await ctx.message.reply("Session manager not initialized.");
+    return;
+  }
+
+  // 첫 번째 인자가 숫자면 count로, 아니면 세션 이름으로 해석
+  let name: string;
+  let count = 10;
+
+  const arg1 = ctx.args[1];
+  const arg2 = ctx.args[2];
+
+  if (arg1 && !isNaN(Number(arg1))) {
+    // !session history 5
+    name = multiSession.getActiveSessionName();
+    count = parseInt(arg1, 10);
+  } else if (arg1) {
+    // !session history work [5]
+    name = arg1;
+    if (arg2 && !isNaN(Number(arg2))) {
+      count = parseInt(arg2, 10);
+    }
+  } else {
+    name = multiSession.getActiveSessionName();
+  }
+
+  const session = multiSession.getSession(name);
+
+  if (!session) {
+    await ctx.message.reply(`Session '${name}' not found.`);
+    return;
+  }
+
+  const history = session.manager.getHistory(count);
+  const isActive = name === multiSession.getActiveSessionName();
+
+  if (history.length === 0) {
+    await ctx.message.reply(`Session '${name}' has no conversation history yet.`);
+    return;
+  }
+
+  const historyLines = history.map((entry, idx) => {
+    const role = entry.role === "user" ? "👤" : "🤖";
+    const time = new Date(entry.timestamp).toLocaleTimeString();
+    const tokens = entry.tokens ? ` (${entry.tokens} tok)` : "";
+    const content = entry.content.length > 100 ? entry.content.slice(0, 100) + "..." : entry.content;
+    return `${role} \`${time}\`${tokens}\n${content}`;
+  });
+
+  const embed = new EmbedBuilder()
+    .setTitle(`History: ${name}${isActive ? " (active)" : ""}`)
+    .setDescription(historyLines.join("\n\n"))
+    .setColor(0x5865F2)
+    .setFooter({ text: `Showing last ${history.length} entries` });
 
   await ctx.message.reply({ embeds: [embed] });
 }

@@ -33,6 +33,8 @@ const helpCommand: PrefixCommand = {
             `\`${p}session new [name]\` — Reset session conversation`,
             `\`${p}session kill [name]\` — Kill session process (alias: \`${p}s stop\`)`,
             `\`${p}session delete <name>\` — Delete session (alias: \`${p}s rm\`)`,
+            `\`${p}session stats [name]\` — Show token usage stats (alias: \`${p}s stat\`)`,
+            `\`${p}session history [name] [count]\` — Show conversation history (alias: \`${p}s h\`)`,
           ].join("\n"),
           inline: false,
         },

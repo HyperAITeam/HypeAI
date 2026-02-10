@@ -42,6 +42,22 @@ export interface CliTool {
   useAgentSdk: boolean;
 }
 
+// --- Session stats & history ---
+
+export interface HistoryEntry {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: number;
+  tokens?: number;
+}
+
+export interface SessionStats {
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalTokens: number;
+  history: HistoryEntry[];
+}
+
 // --- Session manager interface ---
 
 export interface SessionInfo {
@@ -53,6 +69,7 @@ export interface SessionInfo {
   messageCount: number;
   startedAt: number;
   sessionId: string | null;
+  stats?: SessionStats;
 }
 
 // --- Multi-session manager interface ---
@@ -71,5 +88,7 @@ export interface ISessionManager {
   kill(): Promise<boolean>;
   newSession(): Promise<void>;
   getInfo(): SessionInfo;
+  getStats(): SessionStats;
+  getHistory(limit?: number): HistoryEntry[];
   cleanup(): Promise<void>;
 }
