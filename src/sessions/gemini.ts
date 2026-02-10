@@ -3,6 +3,8 @@ import type { Message, TextChannel } from "discord.js";
 import type { ISessionManager, SessionInfo, SessionStats, HistoryEntry } from "./types.js";
 import type { CliTool } from "../types.js";
 import { handleAskUserQuestion } from "../utils/discordPrompt.js";
+import { buildSafeShellCmd } from "../utils/shellEscape.js";
+import { sanitizeOutput } from "../utils/sanitizeOutput.js";
 
 /**
  * Gemini CLI stream-json event types.
@@ -65,7 +67,7 @@ export class GeminiSessionManager implements ISessionManager {
 
   async sendMessage(message: string, discordMessage: Message): Promise<string> {
     const cmd = this.buildCommand(message);
-    const shellCmd = cmd.map((a) => (a.includes(" ") ? `"${a}"` : a)).join(" ");
+    const shellCmd = buildSafeShellCmd(cmd);
     this.lastMessage = message;
 
     console.log(`  [Gemini] Running: ${shellCmd}`);
@@ -170,7 +172,7 @@ export class GeminiSessionManager implements ISessionManager {
 
         if (code !== 0 && !resultText) {
           const stderr = Buffer.concat(errChunks).toString("utf-8").trim();
-          resolve(`[Error] ${stderr || "Gemini CLI exited with error"}`);
+          resolve(`[Error] ${sanitizeOutput(stderr) || "Gemini CLI exited with error"}`);
           return;
         }
 

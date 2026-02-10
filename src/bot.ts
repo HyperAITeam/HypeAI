@@ -9,7 +9,7 @@ import {
   GatewayIntentBits,
   ActivityType,
 } from "discord.js";
-import { DISCORD_BOT_TOKEN, COMMAND_PREFIX, CLI_TOOLS, reloadConfig } from "./config.js";
+import { DISCORD_BOT_TOKEN, COMMAND_PREFIX, CLI_TOOLS, ALLOWED_USER_IDS, reloadConfig } from "./config.js";
 import type { BotClient, PrefixCommand, CommandContext } from "./types.js";
 import type { ISessionManager } from "./sessions/types.js";
 import { ClaudeSessionManager } from "./sessions/claude.js";
@@ -20,6 +20,7 @@ import {
   setMultiSessionManager,
   getMultiSessionManager,
 } from "./sessions/multiSession.js";
+import { sanitizeOutput } from "./utils/sanitizeOutput.js";
 
 // ── Static command imports (for .exe bundling) ──────────────────────
 import askCommand from "./commands/ask.js";
@@ -297,6 +298,13 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  if (ALLOWED_USER_IDS.size === 0) {
+    console.warn();
+    console.warn("  [WARNING] ALLOWED_USER_IDS is empty!");
+    console.warn("  All commands will be denied until user IDs are configured in .env.");
+    console.warn();
+  }
+
   const { cliName, workingDir } = await startupSetup();
 
   const client = new Client({
@@ -350,7 +358,8 @@ async function main(): Promise<void> {
       await cmd.execute(ctx);
     } catch (err: any) {
       console.error(`[error] Command ${cmdName}:`, err);
-      await message.reply(`An error occurred: \`${err.message ?? err}\``).catch(() => {});
+      const safeMsg = sanitizeOutput(String(err.message ?? err));
+      await message.reply(`An error occurred: \`${safeMsg}\``).catch(() => {});
     }
   });
 

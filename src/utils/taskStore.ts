@@ -17,6 +17,35 @@ export interface TaskStore {
 
 const TASKS_FILE = "tasks.json";
 
+/**
+ * Simple Promise-based mutex for serializing file access.
+ */
+class Mutex {
+  private queue: (() => void)[] = [];
+  private locked = false;
+
+  async acquire(): Promise<void> {
+    if (!this.locked) {
+      this.locked = true;
+      return;
+    }
+    return new Promise<void>((resolve) => {
+      this.queue.push(resolve);
+    });
+  }
+
+  release(): void {
+    if (this.queue.length > 0) {
+      const next = this.queue.shift()!;
+      next();
+    } else {
+      this.locked = false;
+    }
+  }
+}
+
+const mutex = new Mutex();
+
 function getTasksPath(workingDir: string): string {
   return path.join(workingDir, TASKS_FILE);
 }
@@ -39,35 +68,50 @@ export function saveTasks(workingDir: string, store: TaskStore): void {
   fs.writeFileSync(filePath, JSON.stringify(store, null, 2), "utf-8");
 }
 
-export function addTask(workingDir: string, content: string): Task {
-  const store = loadTasks(workingDir);
-  const task: Task = {
-    id: store.nextId,
-    content,
-    status: "pending",
-    createdAt: Date.now(),
-  };
-  store.tasks.push(task);
-  store.nextId++;
-  saveTasks(workingDir, store);
-  return task;
+export async function addTask(workingDir: string, content: string): Promise<Task> {
+  await mutex.acquire();
+  try {
+    const store = loadTasks(workingDir);
+    const task: Task = {
+      id: store.nextId,
+      content,
+      status: "pending",
+      createdAt: Date.now(),
+    };
+    store.tasks.push(task);
+    store.nextId++;
+    saveTasks(workingDir, store);
+    return task;
+  } finally {
+    mutex.release();
+  }
 }
 
-export function removeTask(workingDir: string, id: number): boolean {
-  const store = loadTasks(workingDir);
-  const index = store.tasks.findIndex((t) => t.id === id);
-  if (index === -1) return false;
-  store.tasks.splice(index, 1);
-  saveTasks(workingDir, store);
-  return true;
+export async function removeTask(workingDir: string, id: number): Promise<boolean> {
+  await mutex.acquire();
+  try {
+    const store = loadTasks(workingDir);
+    const index = store.tasks.findIndex((t) => t.id === id);
+    if (index === -1) return false;
+    store.tasks.splice(index, 1);
+    saveTasks(workingDir, store);
+    return true;
+  } finally {
+    mutex.release();
+  }
 }
 
-export function clearTasks(workingDir: string): number {
-  const store = loadTasks(workingDir);
-  const count = store.tasks.filter((t) => t.status === "pending").length;
-  store.tasks = store.tasks.filter((t) => t.status !== "pending");
-  saveTasks(workingDir, store);
-  return count;
+export async function clearTasks(workingDir: string): Promise<number> {
+  await mutex.acquire();
+  try {
+    const store = loadTasks(workingDir);
+    const count = store.tasks.filter((t) => t.status === "pending").length;
+    store.tasks = store.tasks.filter((t) => t.status !== "pending");
+    saveTasks(workingDir, store);
+    return count;
+  } finally {
+    mutex.release();
+  }
 }
 
 export function getPendingTasks(workingDir: string): Task[] {
@@ -75,21 +119,26 @@ export function getPendingTasks(workingDir: string): Task[] {
   return store.tasks.filter((t) => t.status === "pending");
 }
 
-export function updateTaskStatus(
+export async function updateTaskStatus(
   workingDir: string,
   id: number,
   status: Task["status"],
   result?: string,
-): void {
-  const store = loadTasks(workingDir);
-  const task = store.tasks.find((t) => t.id === id);
-  if (task) {
-    task.status = status;
-    if (result) task.result = result;
-    if (status === "completed" || status === "failed") {
-      task.completedAt = Date.now();
+): Promise<void> {
+  await mutex.acquire();
+  try {
+    const store = loadTasks(workingDir);
+    const task = store.tasks.find((t) => t.id === id);
+    if (task) {
+      task.status = status;
+      if (result) task.result = result;
+      if (status === "completed" || status === "failed") {
+        task.completedAt = Date.now();
+      }
+      saveTasks(workingDir, store);
     }
-    saveTasks(workingDir, store);
+  } finally {
+    mutex.release();
   }
 }
 
