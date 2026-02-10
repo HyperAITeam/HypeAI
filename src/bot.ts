@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
-import { execSync } from "node:child_process";
 import {
   Client,
   Collection,
@@ -28,6 +27,14 @@ import statusCommand from "./commands/status.js";
 import helpCommand from "./commands/help.js";
 import myidCommand from "./commands/myid.js";
 import taskCommand from "./commands/task.js";
+
+// ── Global error handlers (prevent silent crash in exe) ─────────────
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException]", err);
+});
 
 // ── Console readline helper ──────────────────────────────────────────
 
@@ -233,37 +240,13 @@ function checkClaudePrerequisites(): void {
   const hasCli = fs.existsSync(cliInExeDir) || fs.existsSync(cliInNodeModules);
 
   if (!hasCli) {
-    console.error();
-    console.error("  [ERROR] cli.js 파일을 찾을 수 없습니다!");
-    console.error();
-    console.error("  Claude Code를 사용하려면 exe와 같은 폴더에");
-    console.error("  cli.js 파일이 있어야 합니다.");
-    console.error();
-    console.error("  해결 방법:");
-    console.error("    - Release에서 cli.js를 함께 다운로드하세요.");
-    console.error("    - 또는 build.bat으로 다시 빌드하세요.");
-    console.error();
-    process.exit(1);
+    throw new Error(
+      "cli.js 파일을 찾을 수 없습니다. exe와 같은 폴더에 cli.js를 배치하세요. " +
+      "Release에서 cli.js를 함께 다운로드하거나 build.bat으로 다시 빌드하세요.",
+    );
   }
 
-  // 2) Node.js 설치 확인 (Agent SDK가 subprocess로 node를 사용)
-  try {
-    execSync("node --version", { stdio: "ignore" });
-  } catch {
-    console.error();
-    console.error("  [ERROR] Node.js가 설치되어 있지 않습니다!");
-    console.error();
-    console.error("  Claude Code Agent SDK는 내부적으로 Node.js를");
-    console.error("  사용하여 Claude Code를 실행합니다.");
-    console.error();
-    console.error("  https://nodejs.org 에서 Node.js를 설치해주세요.");
-    console.error();
-    process.exit(1);
-  }
-
-  // Claude Code는 ANTHROPIC_API_KEY 환경변수 외에도
-  // `claude login`으로 저장된 credential로 인증 가능하므로
-  // API 키 유무를 여기서 체크하지 않는다.
+  // Node.js 런타임은 sendMessage 시점에 resolveNodeExecutable()로 자동 탐색/다운로드
 }
 
 // ── Create session manager ───────────────────────────────────────────

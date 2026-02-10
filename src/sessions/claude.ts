@@ -6,6 +6,7 @@ import type { Message, TextChannel } from "discord.js";
 import type { ISessionManager, SessionInfo } from "./types.js";
 import type { CliTool } from "../types.js";
 import { handleAskUserQuestion } from "../utils/discordPrompt.js";
+import { resolveNodeExecutable } from "../utils/nodeRuntime.js";
 
 /**
  * Bun exe 환경에서 Agent SDK의 cli.js 경로를 자동 해석.
@@ -65,7 +66,9 @@ export class ClaudeSessionManager implements ISessionManager {
 
     try {
       const cliPath = resolveClaudeCodePath();
+      const nodePath = await resolveNodeExecutable();
       console.log(`  [Claude] cliPath: ${cliPath ?? "(SDK default)"}`);
+      console.log(`  [Claude] nodePath: ${nodePath}`);
       console.log(`  [Claude] cwd: ${this.cwd}`);
 
       const options: Record<string, unknown> = {
@@ -73,10 +76,10 @@ export class ClaudeSessionManager implements ISessionManager {
         permissionMode: "bypassPermissions",
         allowDangerouslySkipPermissions: true,
         abortController: this.abortController,
-        executable: "node" as const,
+        executable: nodePath,
         ...(cliPath && { pathToClaudeCodeExecutable: cliPath }),
         stderr: (data: string) => console.error("[Claude stderr]", data),
-        // Bun exe의 child_process.spawn은 signal 옵션을 제대로 처리 못함.
+        // pkg exe 환경에서 signal 옵션이 제대로 전달되지 않을 수 있으므로
         // 직접 spawn해서 abort는 수동으로 처리한다.
         spawnClaudeCodeProcess: (spawnOpts: {
           command: string;
@@ -127,17 +130,28 @@ export class ClaudeSessionManager implements ISessionManager {
       let newSessionId: string | null = null;
 
       console.log("  [Claude] Starting query...");
-      for await (const msg of query({ prompt: message, options: options as any })) {
-        console.log(`  [Claude] msg: ${msg.type}${(msg as any).subtype ? "/" + (msg as any).subtype : ""}`);
-        if (msg.type === "system" && (msg as any).subtype === "init") {
-          newSessionId = (msg as any).session_id ?? null;
-        }
-        if (msg.type === "result") {
-          const result = msg as any;
-          resultText = result.result ?? "";
-          if (result.session_id) {
-            newSessionId = result.session_id;
+      const conversation = query({ prompt: message, options: options as any });
+      try {
+        for await (const msg of conversation) {
+          console.log(`  [Claude] msg: ${msg.type}${(msg as any).subtype ? "/" + (msg as any).subtype : ""}`);
+          if (msg.type === "system" && (msg as any).subtype === "init") {
+            newSessionId = (msg as any).session_id ?? null;
           }
+          if (msg.type === "result") {
+            const result = msg as any;
+            resultText = result.result ?? "";
+            if (result.session_id) {
+              newSessionId = result.session_id;
+            }
+          }
+        }
+      } catch (queryErr: any) {
+        console.error("  [Claude] Query error:", queryErr.message ?? queryErr);
+        // 이미 부분 결과가 있으면 반환, 없으면 에러 전파
+        if (resultText.trim()) {
+          console.log("  [Claude] Returning partial result despite error.");
+        } else {
+          throw queryErr;
         }
       }
       console.log("  [Claude] Query complete.");
