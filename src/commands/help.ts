@@ -39,6 +39,18 @@ const helpCommand: PrefixCommand = {
           inline: false,
         },
         {
+          name: "Task Queue",
+          value: [
+            `\`${p}task add <task>\` — Add a scheduled task (alias: \`${p}t a\`)`,
+            `\`${p}task list\` — List all tasks (alias: \`${p}t ls\`)`,
+            `\`${p}task run\` — Run all pending tasks sequentially (alias: \`${p}t r\`)`,
+            `\`${p}task remove <id>\` — Remove a task (alias: \`${p}t rm\`)`,
+            `\`${p}task clear\` — Clear all pending tasks (alias: \`${p}t c\`)`,
+            `\`${p}task stop\` — Stop running tasks (alias: \`${p}t s\`)`,
+          ].join("\n"),
+          inline: false,
+        },
+        {
           name: "CMD Execution",
           value: `\`${p}exec <command>\` — Run a CMD command (aliases: \`${p}run\`, \`${p}cmd\`)`,
           inline: false,
