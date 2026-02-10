@@ -15,8 +15,11 @@ import type { ISessionManager } from "./sessions/types.js";
 import { ClaudeSessionManager } from "./sessions/claude.js";
 import { SubprocessSessionManager } from "./sessions/subprocess.js";
 import { GeminiSessionManager } from "./sessions/gemini.js";
-import { setSession } from "./commands/ask.js";
-import { initSessionCache, getAllCachedSessions } from "./commands/session.js";
+import {
+  MultiSessionManager,
+  setMultiSessionManager,
+  getMultiSessionManager,
+} from "./sessions/multiSession.js";
 
 // ── Static command imports (for .exe bundling) ──────────────────────
 import askCommand from "./commands/ask.js";
@@ -25,6 +28,7 @@ import execCommand from "./commands/exec.js";
 import statusCommand from "./commands/status.js";
 import helpCommand from "./commands/help.js";
 import myidCommand from "./commands/myid.js";
+import taskCommand from "./commands/task.js";
 
 // ── Console readline helper ──────────────────────────────────────────
 
@@ -198,6 +202,7 @@ const allCommands: PrefixCommand[] = [
   statusCommand,
   helpCommand,
   myidCommand,
+  taskCommand,
 ];
 
 function loadCommands(client: BotClient): void {
@@ -307,10 +312,9 @@ async function main(): Promise<void> {
   client.selectedCli = cliName;
   client.workingDir = workingDir;
 
-  // Create session & share with ask command + register in cache
-  const session = createSession(cliName, workingDir);
-  setSession(session);
-  initSessionCache(cliName, session);
+  // Create multi-session manager
+  const multiSession = new MultiSessionManager(workingDir);
+  setMultiSessionManager(multiSession);
 
   // Load commands
   loadCommands(client);
@@ -350,11 +354,13 @@ async function main(): Promise<void> {
     }
   });
 
-  // Graceful shutdown - cleanup all cached sessions
+  // Graceful shutdown - cleanup all sessions
   const shutdown = async () => {
     console.log("\n  Shutting down...");
-    const allSessions = getAllCachedSessions();
-    await Promise.all(allSessions.map((s) => s.cleanup()));
+    const multiSessionMgr = getMultiSessionManager();
+    if (multiSessionMgr) {
+      await multiSessionMgr.cleanup();
+    }
     client.destroy();
     process.exit(0);
   };

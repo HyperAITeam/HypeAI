@@ -1,1 +1,1 @@
-export type { ISessionManager, SessionInfo } from "../types.js";
+export type { ISessionManager, SessionInfo, SessionStats, HistoryEntry } from "../types.js";
