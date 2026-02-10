@@ -80,6 +80,12 @@ Type `!ask review my code` in Discord!
 | `!session info` | `!s` | Check session status |
 | `!session new` | `!s new` | Start new conversation |
 | `!session kill` | `!s stop` | Stop running AI |
+| `!task add <task>` | `!t a` | Add a scheduled task |
+| `!task list` | `!t ls` | List scheduled tasks |
+| `!task run` | `!t r` | Run all pending tasks sequentially |
+| `!task remove <id>` | `!t rm` | Remove a task |
+| `!task clear` | `!t c` | Clear all pending tasks |
+| `!task stop` | `!t s` | Stop running tasks |
 | `!exec <command>` | `!run`, `!cmd` | Execute CMD command |
 | `!status` | `!sysinfo` | System info |
 | `!myid` | `!id` | Check Discord ID |

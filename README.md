@@ -80,6 +80,12 @@ Discord에서 `!ask 코드 리뷰해줘` 입력!
 | `!session info` | `!s` | 현재 세션 상태 확인 |
 | `!session new` | `!s new` | 새 대화 시작 |
 | `!session kill` | `!s stop` | 진행 중인 AI 중단 |
+| `!task add <작업>` | `!t a` | 작업 예약 추가 |
+| `!task list` | `!t ls` | 예약된 작업 목록 |
+| `!task run` | `!t r` | 예약된 작업 순차 실행 |
+| `!task remove <번호>` | `!t rm` | 작업 삭제 |
+| `!task clear` | `!t c` | 대기 중인 작업 전체 삭제 |
+| `!task stop` | `!t s` | 실행 중인 작업 중단 |
 | `!exec <명령어>` | `!run`, `!cmd` | CMD 명령어 실행 |
 | `!status` | `!sysinfo` | 시스템 정보 |
 | `!myid` | `!id` | Discord ID 확인 |
