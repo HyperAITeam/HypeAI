@@ -40,6 +40,24 @@ export interface CliTool {
   jsonOutput: boolean;
   /** true = use Agent SDK instead of subprocess */
   useAgentSdk: boolean;
+  /** true = use stream-json output format (Gemini CLI) */
+  useStreamJson?: boolean;
+}
+
+// --- Session stats & history ---
+
+export interface HistoryEntry {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: number;
+  tokens?: number;
+}
+
+export interface SessionStats {
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalTokens: number;
+  history: HistoryEntry[];
 }
 
 // --- Session manager interface ---
@@ -53,6 +71,7 @@ export interface SessionInfo {
   messageCount: number;
   startedAt: number;
   sessionId: string | null;
+  stats?: SessionStats;
 }
 
 // --- Multi-session manager interface ---
@@ -71,5 +90,7 @@ export interface ISessionManager {
   kill(): Promise<boolean>;
   newSession(): Promise<void>;
   getInfo(): SessionInfo;
+  getStats(): SessionStats;
+  getHistory(limit?: number): HistoryEntry[];
   cleanup(): Promise<void>;
 }

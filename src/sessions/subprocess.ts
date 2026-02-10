@@ -1,12 +1,20 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import type { Message } from "discord.js";
-import type { ISessionManager, SessionInfo } from "./types.js";
+import type { ISessionManager, SessionInfo, SessionStats, HistoryEntry } from "./types.js";
 import type { CliTool } from "../types.js";
 
 /** ANSI escape code 제거 (터미널 색상/커서 코드 → Discord에선 깨짐) */
 function stripAnsi(s: string): string {
   return s.replace(/\x1B(?:\[[0-9;]*[A-Za-z]|\][^\x07]*\x07)/g, "");
 }
+
+/** 간단한 토큰 추정 (약 4자 = 1토큰) */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+const MAX_HISTORY_ENTRIES = 50;
+const MAX_HISTORY_CONTENT_LENGTH = 500;
 
 /**
  * Subprocess-based session for CLIs without an SDK (Gemini, OpenCode).
@@ -24,6 +32,12 @@ export class SubprocessSessionManager implements ISessionManager {
   private startedAt = 0;
   private proc: ChildProcess | null = null;
 
+  // 토큰 및 히스토리 추적
+  private totalInputTokens = 0;
+  private totalOutputTokens = 0;
+  private history: HistoryEntry[] = [];
+  private lastMessage: string = "";
+
   constructor(cliName: string, tool: CliTool, cwd: string) {
     this.cliName = cliName;
     this.tool = tool;
@@ -37,6 +51,7 @@ export class SubprocessSessionManager implements ISessionManager {
   async sendMessage(message: string, _discordMessage: Message): Promise<string> {
     const cmd = this.buildCommand(message);
     const shellCmd = cmd.map((a) => (a.includes(" ") ? `"${a}"` : a)).join(" ");
+    this.lastMessage = message;
 
     return new Promise<string>((resolve) => {
       console.log(`  [${this.cliName}] exec: ${shellCmd}`);
@@ -82,6 +97,15 @@ export class SubprocessSessionManager implements ISessionManager {
         this.messageCount++;
         if (this.startedAt === 0) this.startedAt = Date.now();
 
+        // 토큰 추정 및 히스토리 기록
+        const inputTokens = estimateTokens(this.lastMessage);
+        const outputTokens = estimateTokens(result);
+        this.totalInputTokens += inputTokens;
+        this.totalOutputTokens += outputTokens;
+
+        this.addHistory("user", this.lastMessage, inputTokens);
+        this.addHistory("assistant", result, outputTokens);
+
         resolve(result.trim() || "(no output)");
       });
 
@@ -109,6 +133,9 @@ export class SubprocessSessionManager implements ISessionManager {
     this.sessionId = null;
     this.messageCount = 0;
     this.startedAt = 0;
+    this.totalInputTokens = 0;
+    this.totalOutputTokens = 0;
+    this.history = [];
   }
 
   getInfo(): SessionInfo {
@@ -120,7 +147,41 @@ export class SubprocessSessionManager implements ISessionManager {
       messageCount: this.messageCount,
       startedAt: this.startedAt,
       sessionId: this.sessionId,
+      stats: this.getStats(),
     };
+  }
+
+  getStats(): SessionStats {
+    return {
+      totalInputTokens: this.totalInputTokens,
+      totalOutputTokens: this.totalOutputTokens,
+      totalTokens: this.totalInputTokens + this.totalOutputTokens,
+      history: this.history,
+    };
+  }
+
+  getHistory(limit?: number): HistoryEntry[] {
+    if (limit === undefined) return [...this.history];
+    return this.history.slice(-limit);
+  }
+
+  private addHistory(role: "user" | "assistant", content: string, tokens: number): void {
+    const truncatedContent =
+      content.length > MAX_HISTORY_CONTENT_LENGTH
+        ? content.slice(0, MAX_HISTORY_CONTENT_LENGTH) + "..."
+        : content;
+
+    this.history.push({
+      role,
+      content: truncatedContent,
+      timestamp: Date.now(),
+      tokens,
+    });
+
+    // 최대 히스토리 개수 제한
+    if (this.history.length > MAX_HISTORY_ENTRIES) {
+      this.history = this.history.slice(-MAX_HISTORY_ENTRIES);
+    }
   }
 
   async cleanup(): Promise<void> {

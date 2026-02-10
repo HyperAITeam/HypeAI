@@ -57,10 +57,11 @@ export const CLI_TOOLS: Record<string, CliTool> = {
     rulesFile: "GEMINI.md",
     promptArgs: ["-p"],
     extraFlags: ["--yolo"],
-    resumeFlag: null,
+    resumeFlag: "--resume",
     continueFlag: null,
-    jsonOutput: false,
+    jsonOutput: true,
     useAgentSdk: false,
+    useStreamJson: true,
   },
   opencode: {
     command: "opencode",

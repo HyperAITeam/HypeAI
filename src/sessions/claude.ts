@@ -3,7 +3,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
 import type { Message, TextChannel } from "discord.js";
-import type { ISessionManager, SessionInfo } from "./types.js";
+import type { ISessionManager, SessionInfo, SessionStats, HistoryEntry } from "./types.js";
 import type { CliTool } from "../types.js";
 import { handleAskUserQuestion } from "../utils/discordPrompt.js";
 
@@ -41,6 +41,14 @@ function resolveClaudeCodePath(): string | undefined {
  * - Intercepts AskUserQuestion via `canUseTool` → Discord UI
  * - Maintains session continuity via `resume` option
  */
+/** 간단한 토큰 추정 (약 4자 = 1토큰) */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+const MAX_HISTORY_ENTRIES = 50;
+const MAX_HISTORY_CONTENT_LENGTH = 500;
+
 export class ClaudeSessionManager implements ISessionManager {
   private tool: CliTool;
   private cwd: string;
@@ -49,6 +57,11 @@ export class ClaudeSessionManager implements ISessionManager {
   private startedAt = 0;
   private busy = false;
   private abortController: AbortController | null = null;
+
+  // 토큰 및 히스토리 추적
+  private totalInputTokens = 0;
+  private totalOutputTokens = 0;
+  private history: HistoryEntry[] = [];
 
   constructor(tool: CliTool, cwd: string) {
     this.tool = tool;
@@ -149,6 +162,15 @@ export class ClaudeSessionManager implements ISessionManager {
       this.messageCount++;
       if (this.startedAt === 0) this.startedAt = Date.now();
 
+      // 토큰 추정 및 히스토리 기록
+      const inputTokens = estimateTokens(message);
+      const outputTokens = estimateTokens(resultText);
+      this.totalInputTokens += inputTokens;
+      this.totalOutputTokens += outputTokens;
+
+      this.addHistory("user", message, inputTokens);
+      this.addHistory("assistant", resultText, outputTokens);
+
       return resultText.trim() || "(no output)";
     } catch (err: any) {
       return `[Error] ${err.message ?? err}`;
@@ -171,6 +193,9 @@ export class ClaudeSessionManager implements ISessionManager {
     this.sessionId = null;
     this.messageCount = 0;
     this.startedAt = 0;
+    this.totalInputTokens = 0;
+    this.totalOutputTokens = 0;
+    this.history = [];
   }
 
   getInfo(): SessionInfo {
@@ -182,7 +207,41 @@ export class ClaudeSessionManager implements ISessionManager {
       messageCount: this.messageCount,
       startedAt: this.startedAt,
       sessionId: this.sessionId,
+      stats: this.getStats(),
     };
+  }
+
+  getStats(): SessionStats {
+    return {
+      totalInputTokens: this.totalInputTokens,
+      totalOutputTokens: this.totalOutputTokens,
+      totalTokens: this.totalInputTokens + this.totalOutputTokens,
+      history: this.history,
+    };
+  }
+
+  getHistory(limit?: number): HistoryEntry[] {
+    if (limit === undefined) return [...this.history];
+    return this.history.slice(-limit);
+  }
+
+  private addHistory(role: "user" | "assistant", content: string, tokens: number): void {
+    const truncatedContent =
+      content.length > MAX_HISTORY_CONTENT_LENGTH
+        ? content.slice(0, MAX_HISTORY_CONTENT_LENGTH) + "..."
+        : content;
+
+    this.history.push({
+      role,
+      content: truncatedContent,
+      timestamp: Date.now(),
+      tokens,
+    });
+
+    // 최대 히스토리 개수 제한
+    if (this.history.length > MAX_HISTORY_ENTRIES) {
+      this.history = this.history.slice(-MAX_HISTORY_ENTRIES);
+    }
   }
 
   async cleanup(): Promise<void> {

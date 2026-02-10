@@ -14,6 +14,7 @@ import type { BotClient, PrefixCommand, CommandContext } from "./types.js";
 import type { ISessionManager } from "./sessions/types.js";
 import { ClaudeSessionManager } from "./sessions/claude.js";
 import { SubprocessSessionManager } from "./sessions/subprocess.js";
+import { GeminiSessionManager } from "./sessions/gemini.js";
 import {
   MultiSessionManager,
   setMultiSessionManager,
@@ -270,10 +271,19 @@ function checkClaudePrerequisites(): void {
 
 export function createSession(cliName: string, cwd: string): ISessionManager {
   const tool = CLI_TOOLS[cliName];
+
+  // Claude: Agent SDK
   if (tool.useAgentSdk) {
     checkClaudePrerequisites();
     return new ClaudeSessionManager(tool, cwd);
   }
+
+  // Gemini: Stream JSON with session resume
+  if (tool.useStreamJson) {
+    return new GeminiSessionManager(tool, cwd);
+  }
+
+  // Others (OpenCode, etc.): Basic subprocess
   return new SubprocessSessionManager(cliName, tool, cwd);
 }
 
