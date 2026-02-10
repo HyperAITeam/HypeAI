@@ -10,12 +10,33 @@ export let DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN ?? "";
 export let COMMAND_PREFIX = process.env.COMMAND_PREFIX ?? "!";
 
 // Security
-export let ALLOWED_USER_IDS = new Set(
-  (process.env.ALLOWED_USER_IDS ?? "")
-    .split(",")
-    .map((id) => id.trim())
-    .filter(Boolean),
-);
+function parseAllowedUserIds(raw: string): Set<string> {
+  const ids = raw.split(",").map((id) => id.trim()).filter(Boolean);
+  const validIds: string[] = [];
+  const invalidIds: string[] = [];
+
+  for (const id of ids) {
+    if (/^\d{17,19}$/.test(id)) {
+      validIds.push(id);
+    } else {
+      invalidIds.push(id);
+    }
+  }
+
+  if (invalidIds.length > 0) {
+    console.warn(
+      `\n⚠️  경고: ALLOWED_USER_IDS에 잘못된 형식이 있습니다!\n` +
+      `   잘못된 값: ${invalidIds.join(", ")}\n` +
+      `   Discord ID는 17-19자리 숫자여야 합니다.\n` +
+      `   예시: 123456789012345678\n` +
+      `   💡 ID 확인: Discord에서 !myid 명령어 사용\n`
+    );
+  }
+
+  return new Set(validIds);
+}
+
+export let ALLOWED_USER_IDS = parseAllowedUserIds(process.env.ALLOWED_USER_IDS ?? "");
 
 // Timeouts
 export let COMMAND_TIMEOUT = parseInt(process.env.COMMAND_TIMEOUT ?? "30", 10);
@@ -26,12 +47,7 @@ export function reloadConfig(): void {
   dotenv.config({ path: path.join(process.cwd(), ".env"), override: true });
   DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN ?? "";
   COMMAND_PREFIX = process.env.COMMAND_PREFIX ?? "!";
-  ALLOWED_USER_IDS = new Set(
-    (process.env.ALLOWED_USER_IDS ?? "")
-      .split(",")
-      .map((id) => id.trim())
-      .filter(Boolean),
-  );
+  ALLOWED_USER_IDS = parseAllowedUserIds(process.env.ALLOWED_USER_IDS ?? "");
   COMMAND_TIMEOUT = parseInt(process.env.COMMAND_TIMEOUT ?? "30", 10);
   AI_CLI_TIMEOUT = parseInt(process.env.AI_CLI_TIMEOUT ?? "300", 10);
 }

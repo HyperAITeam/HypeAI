@@ -165,11 +165,13 @@ npx tsx src/bot.ts
 | 변수 | 필수 | 기본값 | 설명 |
 |:-----|:----:|:------:|:-----|
 | `DISCORD_BOT_TOKEN` | ✅ | — | Discord 봇 토큰 |
-| `ALLOWED_USER_IDS` | ✅ | — | 허용할 유저 ID (쉼표 구분) |
+| `ALLOWED_USER_IDS` | ✅ | — | 허용할 유저 ID (17-19자리 숫자, 쉼표 구분) |
 | `ANTHROPIC_API_KEY` | ❌ | — | API 키 (`claude login` 시 불필요) |
 | `COMMAND_PREFIX` | ❌ | `!` | 명령어 접두사 |
 | `COMMAND_TIMEOUT` | ❌ | `30` | CMD 타임아웃 (초) |
 | `AI_CLI_TIMEOUT` | ❌ | `300` | AI 타임아웃 (초) |
+
+> ⚠️ **보안 주의**: Discord ID는 17-19자리 **숫자**입니다 (유저네임 ❌). ID는 외부에 노출하지 마세요!
 
 ### 여러 유저 허용
 
