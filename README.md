@@ -248,6 +248,21 @@ dist/
 
 ---
 
+## ☕ 후원하기
+
+이 프로젝트가 도움이 됐다면 커피 한 잔 사주세요!
+
+<div align="center">
+
+| Maintainer | Support |
+|:----------:|:-------:|
+| **hamsik2rang** | [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/hamsik2rang) |
+| **osgood** | [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/osgoodyz) |
+
+</div>
+
+---
+
 ## 📄 라이선스
 
 [MIT](LICENSE) © 2024
