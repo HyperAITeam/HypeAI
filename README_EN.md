@@ -248,6 +248,21 @@ Contributions are welcome! Please check [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
+## ☕ Support
+
+If this project helped you, buy us a coffee!
+
+<div align="center">
+
+| Maintainer | Support |
+|:----------:|:-------:|
+| **hamsik2rang** | [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/hamsik2rang) |
+| **osgood** | [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/osgoodyz) |
+
+</div>
+
+---
+
 ## 📄 License
 
 [MIT](LICENSE) © 2024

@@ -27,6 +27,7 @@ import execCommand from "./commands/exec.js";
 import statusCommand from "./commands/status.js";
 import helpCommand from "./commands/help.js";
 import myidCommand from "./commands/myid.js";
+import taskCommand from "./commands/task.js";
 
 // ── Console readline helper ──────────────────────────────────────────
 
@@ -200,6 +201,7 @@ const allCommands: PrefixCommand[] = [
   statusCommand,
   helpCommand,
   myidCommand,
+  taskCommand,
 ];
 
 function loadCommands(client: BotClient): void {
