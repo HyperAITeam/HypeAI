@@ -9,7 +9,12 @@ import {
   GatewayIntentBits,
   ActivityType,
 } from "discord.js";
-import { DISCORD_BOT_TOKEN, COMMAND_PREFIX, CLI_TOOLS, ALLOWED_USER_IDS, reloadConfig } from "./config.js";
+import {
+  DISCORD_BOT_TOKEN, COMMAND_PREFIX, CLI_TOOLS, ALLOWED_USER_IDS, reloadConfig,
+  AUDIT_LOG_DIR, AUDIT_LOG_ENABLED,
+  RATE_LIMIT_MAX, RATE_LIMIT_WINDOW,
+  APPLICATION_ID, SLASH_COMMAND_GUILD_ID,
+} from "./config.js";
 import type { BotClient, PrefixCommand, CommandContext } from "./types.js";
 import type { ISessionManager } from "./sessions/types.js";
 import { ClaudeSessionManager } from "./sessions/claude.js";
@@ -21,6 +26,10 @@ import {
   getMultiSessionManager,
 } from "./sessions/multiSession.js";
 import { sanitizeOutput } from "./utils/sanitizeOutput.js";
+import { initAuditLogger, getAuditLogger, audit, AuditEvent } from "./utils/auditLog.js";
+import { initRateLimiter, getRateLimiter } from "./utils/rateLimiter.js";
+import { isAllowedUser } from "./utils/security.js";
+import { registerSlashCommands, buildSlashCollection, type SlashCommand } from "./slashCommands/index.js";
 
 // ── Static command imports (for .exe bundling) ──────────────────────
 import askCommand from "./commands/ask.js";
@@ -317,19 +326,40 @@ async function main(): Promise<void> {
 
   client.commands = new Collection();
   client.aliases = new Collection();
+  client.slashCommands = buildSlashCollection();
   client.selectedCli = cliName;
   client.workingDir = workingDir;
+
+  // Initialize audit logger
+  if (AUDIT_LOG_ENABLED) {
+    initAuditLogger(path.resolve(workingDir, AUDIT_LOG_DIR));
+    console.log(`  [audit] Logging to ${path.resolve(workingDir, AUDIT_LOG_DIR)}`);
+  }
+
+  // Initialize rate limiter
+  initRateLimiter({
+    maxTokens: RATE_LIMIT_MAX,
+    refillRate: 1,
+    refillIntervalMs: RATE_LIMIT_WINDOW * 1000,
+  });
+  console.log(`  [rate] Max ${RATE_LIMIT_MAX} requests per ${RATE_LIMIT_WINDOW}s`);
 
   // Create multi-session manager
   const multiSession = new MultiSessionManager(workingDir);
   setMultiSessionManager(multiSession);
+
+  // Restore persisted sessions
+  const restored = multiSession.restoreFromDisk();
+  if (restored > 0) {
+    console.log(`  [persist] Restored ${restored} session(s) from disk`);
+  }
 
   // Load commands
   loadCommands(client);
 
   // ── Events ──
 
-  client.on(Events.ClientReady, () => {
+  client.on(Events.ClientReady, async () => {
     const tool = CLI_TOOLS[cliName];
     const folder = path.basename(workingDir);
     console.log(`  Logged in as ${client.user?.tag}`);
@@ -337,6 +367,19 @@ async function main(): Promise<void> {
     client.user?.setActivity(`${tool.name} @ ${folder}`, {
       type: ActivityType.Listening,
     });
+
+    // Register slash commands if APPLICATION_ID is set
+    if (APPLICATION_ID) {
+      try {
+        await registerSlashCommands(
+          APPLICATION_ID,
+          DISCORD_BOT_TOKEN,
+          SLASH_COMMAND_GUILD_ID || undefined,
+        );
+      } catch (err: any) {
+        console.error(`  [slash] Failed to register: ${err.message}`);
+      }
+    }
   });
 
   client.on(Events.MessageCreate, async (message) => {
@@ -352,14 +395,84 @@ async function main(): Promise<void> {
       client.commands.get(client.aliases.get(cmdName) ?? "");
     if (!cmd) return;
 
+    // Rate limiting
+    const rateLimiter = getRateLimiter();
+    if (rateLimiter) {
+      const { allowed, retryAfterMs } = rateLimiter.tryConsume(message.author.id);
+      if (!allowed) {
+        const secs = Math.ceil(retryAfterMs / 1000);
+        audit(AuditEvent.RATE_LIMITED, message.author.id, {
+          command: cmdName,
+          success: false,
+        });
+        await message.reply(`Rate limited. Try again in ${secs}s.`).catch(() => {});
+        return;
+      }
+    }
+
+    // Audit: command executed
+    audit(AuditEvent.COMMAND_EXECUTED, message.author.id, { command: cmdName });
+
     const ctx: CommandContext = { message, args, client };
 
     try {
       await cmd.execute(ctx);
     } catch (err: any) {
       console.error(`[error] Command ${cmdName}:`, err);
+      audit(AuditEvent.COMMAND_ERROR, message.author.id, {
+        command: cmdName,
+        success: false,
+        details: { error: String(err.message ?? err) },
+      });
       const safeMsg = sanitizeOutput(String(err.message ?? err));
       await message.reply(`An error occurred: \`${safeMsg}\``).catch(() => {});
+    }
+  });
+
+  // ── Slash command handler ──
+  client.on(Events.InteractionCreate, async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
+
+    const slashCmd = client.slashCommands.get(interaction.commandName) as SlashCommand | undefined;
+    if (!slashCmd) return;
+
+    // Rate limiting for slash commands
+    const rateLimiter = getRateLimiter();
+    if (rateLimiter) {
+      const { allowed, retryAfterMs } = rateLimiter.tryConsume(interaction.user.id);
+      if (!allowed) {
+        const secs = Math.ceil(retryAfterMs / 1000);
+        audit(AuditEvent.RATE_LIMITED, interaction.user.id, {
+          command: interaction.commandName,
+          success: false,
+        });
+        await interaction.reply({
+          content: `Rate limited. Try again in ${secs}s.`,
+          ephemeral: true,
+        }).catch(() => {});
+        return;
+      }
+    }
+
+    audit(AuditEvent.COMMAND_EXECUTED, interaction.user.id, {
+      command: `/${interaction.commandName}`,
+    });
+
+    try {
+      await slashCmd.execute(interaction, client);
+    } catch (err: any) {
+      console.error(`[error] Slash /${interaction.commandName}:`, err);
+      audit(AuditEvent.COMMAND_ERROR, interaction.user.id, {
+        command: `/${interaction.commandName}`,
+        success: false,
+        details: { error: String(err.message ?? err) },
+      });
+      const content = `An error occurred: \`${String(err.message ?? err).slice(0, 100)}\``;
+      if (interaction.replied || interaction.deferred) {
+        await interaction.editReply(content).catch(() => {});
+      } else {
+        await interaction.reply({ content, ephemeral: true }).catch(() => {});
+      }
     }
   });
 
@@ -368,8 +481,11 @@ async function main(): Promise<void> {
     console.log("\n  Shutting down...");
     const multiSessionMgr = getMultiSessionManager();
     if (multiSessionMgr) {
+      multiSessionMgr.persistToDisk();
       await multiSessionMgr.cleanup();
     }
+    const logger = getAuditLogger();
+    if (logger) await logger.shutdown();
     client.destroy();
     process.exit(0);
   };

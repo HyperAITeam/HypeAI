@@ -20,6 +20,7 @@ export interface PrefixCommand {
 export interface BotClient extends Client {
   commands: Collection<string, PrefixCommand>;
   aliases: Collection<string, string>;
+  slashCommands: Collection<string, unknown>;
   selectedCli: string;
   workingDir: string;
 }
@@ -84,6 +85,15 @@ export interface NamedSession {
   lastUsedAt: number; // 마지막 사용 시간
 }
 
+export interface PersistedSessionState {
+  sessionId: string | null;
+  messageCount: number;
+  startedAt: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  history: HistoryEntry[];
+}
+
 export interface ISessionManager {
   readonly isBusy: boolean;
   sendMessage(message: string, discordMessage: Message): Promise<string>;
@@ -93,4 +103,6 @@ export interface ISessionManager {
   getStats(): SessionStats;
   getHistory(limit?: number): HistoryEntry[];
   cleanup(): Promise<void>;
+  getPersistedState(): PersistedSessionState;
+  restoreFromState(state: PersistedSessionState): void;
 }

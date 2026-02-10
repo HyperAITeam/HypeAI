@@ -47,6 +47,22 @@ export function reloadConfig(): void {
   AI_CLI_TIMEOUT = clampTimeout(
     parseInt(process.env.AI_CLI_TIMEOUT ?? "300", 10), 300, 30, 1800,
   );
+  AUDIT_LOG_DIR = process.env.AUDIT_LOG_DIR ?? "logs";
+  AUDIT_LOG_ENABLED = (process.env.AUDIT_LOG_ENABLED ?? "true").toLowerCase() === "true";
+  RATE_LIMIT_MAX = clampTimeout(
+    parseInt(process.env.RATE_LIMIT_MAX ?? "5", 10), 5, 1, 100,
+  );
+  RATE_LIMIT_WINDOW = clampTimeout(
+    parseInt(process.env.RATE_LIMIT_WINDOW ?? "10", 10), 10, 1, 300,
+  );
+  RETRY_MAX_ATTEMPTS = clampTimeout(
+    parseInt(process.env.RETRY_MAX_ATTEMPTS ?? "3", 10), 3, 0, 10,
+  );
+  RETRY_BASE_DELAY_MS = clampTimeout(
+    parseInt(process.env.RETRY_BASE_DELAY_MS ?? "1000", 10), 1000, 500, 10000,
+  );
+  APPLICATION_ID = process.env.APPLICATION_ID ?? "";
+  SLASH_COMMAND_GUILD_ID = process.env.SLASH_COMMAND_GUILD_ID ?? "";
 }
 
 // CLI tool definitions
@@ -102,6 +118,32 @@ export const BLOCKED_COMMANDS = new Set([
   "taskkill", "schtasks", "netsh",
   "bootrec", "bcdboot", "setx", "erase /s",
 ]);
+
+// Audit Logging
+export let AUDIT_LOG_DIR = process.env.AUDIT_LOG_DIR ?? "logs";
+export let AUDIT_LOG_ENABLED = (process.env.AUDIT_LOG_ENABLED ?? "true").toLowerCase() === "true";
+
+// Rate Limiting
+export let RATE_LIMIT_MAX = clampTimeout(
+  parseInt(process.env.RATE_LIMIT_MAX ?? "5", 10), 5, 1, 100,
+);
+export let RATE_LIMIT_WINDOW = clampTimeout(
+  parseInt(process.env.RATE_LIMIT_WINDOW ?? "10", 10), 10, 1, 300,
+);
+
+// Auto Retry
+export let RETRY_MAX_ATTEMPTS = clampTimeout(
+  parseInt(process.env.RETRY_MAX_ATTEMPTS ?? "3", 10), 3, 0, 10,
+);
+export let RETRY_BASE_DELAY_MS = clampTimeout(
+  parseInt(process.env.RETRY_BASE_DELAY_MS ?? "1000", 10), 1000, 500, 10000,
+);
+
+// Session Persistence (no extra config — uses workingDir)
+
+// Slash Commands
+export let APPLICATION_ID = process.env.APPLICATION_ID ?? "";
+export let SLASH_COMMAND_GUILD_ID = process.env.SLASH_COMMAND_GUILD_ID ?? "";
 
 // Discord message limit
 export const DISCORD_MAX_LENGTH = 2000;

@@ -4,6 +4,7 @@ import type { PrefixCommand, CommandContext } from "../types.js";
 import { CLI_TOOLS } from "../config.js";
 import { isAllowedUser } from "../utils/security.js";
 import { getMultiSessionManager } from "../sessions/multiSession.js";
+import { audit, AuditEvent } from "../utils/auditLog.js";
 
 const sessionCommand: PrefixCommand = {
   name: "session",
@@ -73,6 +74,11 @@ async function handleCreate(ctx: CommandContext): Promise<void> {
   try {
     const session = multiSession.createSession(name, cliName);
     const tool = CLI_TOOLS[cliName];
+
+    audit(AuditEvent.SESSION_CREATED, ctx.message.author.id, {
+      sessionName: name,
+      details: { cli: cliName },
+    });
 
     const embed = new EmbedBuilder()
       .setTitle("Session Created")
@@ -152,6 +158,7 @@ async function handleDelete(ctx: CommandContext): Promise<void> {
 
   const deleted = await multiSession.deleteSession(name);
   if (deleted) {
+    audit(AuditEvent.SESSION_DELETED, ctx.message.author.id, { sessionName: name });
     await ctx.message.reply(`Session '${name}' deleted.`);
   } else {
     await ctx.message.reply(`Failed to delete session '${name}'.`);
@@ -178,6 +185,7 @@ async function handleNew(ctx: CommandContext): Promise<void> {
   }
 
   await session.manager.newSession();
+  audit(AuditEvent.SESSION_RESET, ctx.message.author.id, { sessionName: name });
   const tool = CLI_TOOLS[session.cliName];
   await ctx.message.reply(
     `Session '${name}' reset. Next message starts a new **${tool.name}** conversation.`,
@@ -246,6 +254,10 @@ async function handleSwitch(ctx: CommandContext): Promise<void> {
   }
 
   multiSession.setActiveSession(targetName);
+  audit(AuditEvent.SESSION_SWITCHED, ctx.message.author.id, {
+    sessionName: targetName,
+    details: { from: currentActive },
+  });
 
   // Update bot activity
   const tool = CLI_TOOLS[session.cliName];

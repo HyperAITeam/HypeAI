@@ -4,6 +4,14 @@ import type { NamedSession } from "../types.js";
 import { CLI_TOOLS } from "../config.js";
 import { createSession } from "../bot.js";
 import { wrapWithSecurityContext } from "../utils/promptGuard.js";
+import {
+  saveSessionStore,
+  loadSessionStore,
+  getSessionStorePath,
+  type SessionStoreData,
+  type PersistedSession,
+} from "../utils/sessionStore.js";
+import { audit, AuditEvent } from "../utils/auditLog.js";
 
 /**
  * 멀티 세션 매니저
@@ -58,6 +66,7 @@ export class MultiSessionManager {
     };
 
     this.sessions.set(name, namedSession);
+    this.schedulePersist();
     return namedSession;
   }
 
@@ -90,6 +99,7 @@ export class MultiSessionManager {
       this.activeSessionName = "default";
     }
 
+    this.schedulePersist();
     return true;
   }
 
@@ -163,7 +173,9 @@ export class MultiSessionManager {
 
     session.lastUsedAt = Date.now();
     const wrappedMessage = wrapWithSecurityContext(message, this.workingDir);
-    return session.manager.sendMessage(wrappedMessage, discordMessage);
+    const result = await session.manager.sendMessage(wrappedMessage, discordMessage);
+    this.schedulePersist();
+    return result;
   }
 
   /**
@@ -184,6 +196,7 @@ export class MultiSessionManager {
       throw new Error(`Session '${name}' not found.`);
     }
     await session.manager.newSession();
+    this.schedulePersist();
   }
 
   /**
@@ -193,6 +206,108 @@ export class MultiSessionManager {
     const cleanups = Array.from(this.sessions.values()).map((s) => s.manager.cleanup());
     await Promise.all(cleanups);
     this.sessions.clear();
+  }
+
+  // --- Session Persistence ---
+
+  private persistTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Debounced auto-save (2 seconds) */
+  private schedulePersist(): void {
+    if (this.persistTimer) clearTimeout(this.persistTimer);
+    this.persistTimer = setTimeout(() => {
+      this.persistToDisk();
+      this.persistTimer = null;
+    }, 2000);
+  }
+
+  /** Save all sessions to disk */
+  persistToDisk(): void {
+    if (this.persistTimer) {
+      clearTimeout(this.persistTimer);
+      this.persistTimer = null;
+    }
+
+    const sessions: PersistedSession[] = [];
+    for (const [, ns] of this.sessions) {
+      const state = ns.manager.getPersistedState();
+      sessions.push({
+        name: ns.name,
+        cliName: ns.cliName,
+        sessionId: state.sessionId,
+        createdAt: ns.createdAt,
+        lastUsedAt: ns.lastUsedAt,
+        messageCount: state.messageCount,
+        startedAt: state.startedAt,
+        totalInputTokens: state.totalInputTokens,
+        totalOutputTokens: state.totalOutputTokens,
+        history: state.history,
+      });
+    }
+
+    const data: SessionStoreData = {
+      version: 1,
+      activeSessionName: this.activeSessionName,
+      workingDir: this.workingDir,
+      sessions,
+      savedAt: Date.now(),
+    };
+
+    const storePath = getSessionStorePath(this.workingDir);
+    saveSessionStore(storePath, data);
+    audit(AuditEvent.SESSION_PERSISTED, "system", {
+      details: { sessionCount: sessions.length },
+    });
+  }
+
+  /** Restore sessions from disk. Returns number of restored sessions. */
+  restoreFromDisk(): number {
+    const storePath = getSessionStorePath(this.workingDir);
+    const data = loadSessionStore(storePath);
+    if (!data) return 0;
+
+    let restored = 0;
+    for (const ps of data.sessions) {
+      if (!CLI_TOOLS[ps.cliName]) continue;
+      if (this.sessions.has(ps.name)) continue;
+
+      try {
+        const manager = createSession(ps.cliName, this.workingDir);
+        manager.restoreFromState({
+          sessionId: ps.sessionId,
+          messageCount: ps.messageCount,
+          startedAt: ps.startedAt,
+          totalInputTokens: ps.totalInputTokens,
+          totalOutputTokens: ps.totalOutputTokens,
+          history: ps.history,
+        });
+
+        const namedSession: NamedSession = {
+          name: ps.name,
+          cliName: ps.cliName,
+          manager,
+          createdAt: ps.createdAt,
+          lastUsedAt: ps.lastUsedAt,
+        };
+
+        this.sessions.set(ps.name, namedSession);
+        restored++;
+      } catch (err: any) {
+        console.error(`  [persist] Failed to restore session '${ps.name}': ${err.message}`);
+      }
+    }
+
+    if (data.activeSessionName && this.sessions.has(data.activeSessionName)) {
+      this.activeSessionName = data.activeSessionName;
+    }
+
+    if (restored > 0) {
+      audit(AuditEvent.SESSION_RESTORED, "system", {
+        details: { restoredCount: restored },
+      });
+    }
+
+    return restored;
   }
 }
 

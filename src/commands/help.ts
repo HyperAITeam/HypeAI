@@ -65,6 +65,11 @@ const helpCommand: PrefixCommand = {
           inline: false,
         },
       )
+      .addFields({
+        name: "Slash Commands",
+        value: "Slash commands (`/ask`, `/session`, `/exec`, `/task`, `/status`, `/help`) are also available if configured.",
+        inline: false,
+      })
       .setFooter({ text: "Only authorized users can use this bot." });
 
     await ctx.message.reply({ embeds: [embed] });

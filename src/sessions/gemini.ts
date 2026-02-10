@@ -5,6 +5,9 @@ import type { CliTool } from "../types.js";
 import { handleAskUserQuestion } from "../utils/discordPrompt.js";
 import { buildSafeShellCmd } from "../utils/shellEscape.js";
 import { sanitizeOutput } from "../utils/sanitizeOutput.js";
+import { withRetry } from "../utils/retry.js";
+import { RETRY_MAX_ATTEMPTS, RETRY_BASE_DELAY_MS } from "../config.js";
+import { audit, AuditEvent } from "../utils/auditLog.js";
 
 /**
  * Gemini CLI stream-json event types.
@@ -66,14 +69,56 @@ export class GeminiSessionManager implements ISessionManager {
   }
 
   async sendMessage(message: string, discordMessage: Message): Promise<string> {
+    this.lastMessage = message;
+
+    try {
+      const resultText = await withRetry(
+        () => this._executeQuery(message, discordMessage),
+        {
+          maxRetries: RETRY_MAX_ATTEMPTS,
+          baseDelayMs: RETRY_BASE_DELAY_MS,
+          maxDelayMs: 30000,
+          backoffMultiplier: 2,
+        },
+        async (attempt, error, delayMs) => {
+          audit(AuditEvent.RETRY_ATTEMPTED, discordMessage.author.id, {
+            details: { attempt, error: error.message, delayMs },
+          });
+          const secs = Math.ceil(delayMs / 1000);
+          if ("send" in discordMessage.channel) {
+            await discordMessage.channel.send(
+              `Retry ${attempt}/${RETRY_MAX_ATTEMPTS} in ${secs}s... (${error.message})`,
+            ).catch(() => {});
+          }
+        },
+      );
+
+      this.messageCount++;
+      if (this.startedAt === 0) this.startedAt = Date.now();
+
+      const inputTokens = estimateTokens(this.lastMessage);
+      const outputTokens = estimateTokens(resultText);
+      this.totalInputTokens += inputTokens;
+      this.totalOutputTokens += outputTokens;
+
+      this.addHistory("user", this.lastMessage, inputTokens);
+      this.addHistory("assistant", resultText, outputTokens);
+
+      console.log(`  [Gemini] Query complete. Session: ${this.sessionId}`);
+      return resultText.trim() || "(no output)";
+    } catch (err: any) {
+      return `[Error] ${err.message ?? err}`;
+    }
+  }
+
+  private _executeQuery(message: string, discordMessage: Message): Promise<string> {
     const cmd = this.buildCommand(message);
     const shellCmd = buildSafeShellCmd(cmd);
-    this.lastMessage = message;
 
     console.log(`  [Gemini] Running: ${shellCmd}`);
     console.log(`  [Gemini] cwd: ${this.cwd}`);
 
-    return new Promise<string>((resolve) => {
+    return new Promise<string>((resolve, reject) => {
       const proc = spawn(shellCmd, {
         shell: true,
         cwd: this.cwd,
@@ -85,11 +130,10 @@ export class GeminiSessionManager implements ISessionManager {
       let newSessionId: string | null = null;
       let lineBuffer = "";
 
-      // Process stream-json output line by line
       proc.stdout?.on("data", async (data: Buffer) => {
         lineBuffer += data.toString("utf-8");
         const lines = lineBuffer.split("\n");
-        lineBuffer = lines.pop() ?? ""; // Keep incomplete line in buffer
+        lineBuffer = lines.pop() ?? "";
 
         for (const line of lines) {
           if (!line.trim()) continue;
@@ -113,7 +157,6 @@ export class GeminiSessionManager implements ISessionManager {
                 break;
 
               case "tool_use":
-                // Handle interactive tool prompts via Discord UI
                 if (event.tool_name === "ask_followup" && event.tool_input) {
                   await this.handleToolUse(
                     event.tool_name,
@@ -124,7 +167,6 @@ export class GeminiSessionManager implements ISessionManager {
                 break;
 
               case "result":
-                // Final result event - may contain the complete response
                 if (event.content) {
                   resultText = event.content;
                 }
@@ -140,7 +182,6 @@ export class GeminiSessionManager implements ISessionManager {
                 break;
             }
           } catch (parseErr) {
-            // Not valid JSON, might be plain text output
             console.log(`  [Gemini] non-json line: ${line.slice(0, 100)}`);
           }
         }
@@ -155,7 +196,6 @@ export class GeminiSessionManager implements ISessionManager {
       proc.on("close", (code) => {
         this.proc = null;
 
-        // Process any remaining buffered content
         if (lineBuffer.trim()) {
           try {
             const event = JSON.parse(lineBuffer) as GeminiStreamEvent;
@@ -172,7 +212,7 @@ export class GeminiSessionManager implements ISessionManager {
 
         if (code !== 0 && !resultText) {
           const stderr = Buffer.concat(errChunks).toString("utf-8").trim();
-          resolve(`[Error] ${sanitizeOutput(stderr) || "Gemini CLI exited with error"}`);
+          reject(new Error(sanitizeOutput(stderr) || "Gemini CLI exited with error"));
           return;
         }
 
@@ -180,29 +220,12 @@ export class GeminiSessionManager implements ISessionManager {
           this.sessionId = newSessionId;
         }
 
-        this.messageCount++;
-        if (this.startedAt === 0) this.startedAt = Date.now();
-
-        // 토큰 추정 및 히스토리 기록
-        const inputTokens = estimateTokens(this.lastMessage);
-        const outputTokens = estimateTokens(resultText);
-        this.totalInputTokens += inputTokens;
-        this.totalOutputTokens += outputTokens;
-
-        this.addHistory("user", this.lastMessage, inputTokens);
-        this.addHistory("assistant", resultText, outputTokens);
-
-        console.log(`  [Gemini] Query complete. Session: ${this.sessionId}`);
-        resolve(resultText.trim() || "(no output)");
+        resolve(resultText);
       });
 
       proc.on("error", (err) => {
         this.proc = null;
-        if (err.message.includes("ENOENT")) {
-          resolve("[Error] `gemini` is not installed or not in PATH.");
-        } else {
-          resolve(`[Error] Failed to run gemini: ${err.message}`);
-        }
+        reject(err);
       });
     });
   }
@@ -268,6 +291,26 @@ export class GeminiSessionManager implements ISessionManager {
     if (this.history.length > MAX_HISTORY_ENTRIES) {
       this.history = this.history.slice(-MAX_HISTORY_ENTRIES);
     }
+  }
+
+  getPersistedState(): import("../types.js").PersistedSessionState {
+    return {
+      sessionId: this.sessionId,
+      messageCount: this.messageCount,
+      startedAt: this.startedAt,
+      totalInputTokens: this.totalInputTokens,
+      totalOutputTokens: this.totalOutputTokens,
+      history: [...this.history],
+    };
+  }
+
+  restoreFromState(state: import("../types.js").PersistedSessionState): void {
+    this.sessionId = state.sessionId;
+    this.messageCount = state.messageCount;
+    this.startedAt = state.startedAt;
+    this.totalInputTokens = state.totalInputTokens;
+    this.totalOutputTokens = state.totalOutputTokens;
+    this.history = [...state.history];
   }
 
   async cleanup(): Promise<void> {
