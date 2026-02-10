@@ -2,6 +2,8 @@ import { spawn, type ChildProcess } from "node:child_process";
 import type { Message } from "discord.js";
 import type { ISessionManager, SessionInfo, SessionStats, HistoryEntry } from "./types.js";
 import type { CliTool } from "../types.js";
+import { buildSafeShellCmd } from "../utils/shellEscape.js";
+import { sanitizeOutput } from "../utils/sanitizeOutput.js";
 
 /** ANSI escape code 제거 (터미널 색상/커서 코드 → Discord에선 깨짐) */
 function stripAnsi(s: string): string {
@@ -50,7 +52,7 @@ export class SubprocessSessionManager implements ISessionManager {
 
   async sendMessage(message: string, _discordMessage: Message): Promise<string> {
     const cmd = this.buildCommand(message);
-    const shellCmd = cmd.map((a) => (a.includes(" ") ? `"${a}"` : a)).join(" ");
+    const shellCmd = buildSafeShellCmd(cmd);
     this.lastMessage = message;
 
     return new Promise<string>((resolve) => {
@@ -87,7 +89,7 @@ export class SubprocessSessionManager implements ISessionManager {
 
         if (code !== 0) {
           const err = stderr.trim() || stdout.trim() || "CLI exited with error";
-          resolve(`[Error] ${err}`);
+          resolve(`[Error] ${sanitizeOutput(err)}`);
           return;
         }
 

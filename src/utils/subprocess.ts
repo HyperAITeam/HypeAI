@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { sanitizeOutput } from "./sanitizeOutput.js";
 
 export interface RunResult {
   code: number | null;
@@ -52,7 +53,7 @@ export function runCommand(
       resolve({
         code: null,
         stdout: "",
-        stderr: `Failed to execute: ${err.message}`,
+        stderr: `Failed to execute: ${sanitizeOutput(err.message)}`,
       });
     });
   });
