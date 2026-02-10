@@ -6,6 +6,7 @@ import { sendResult } from "../utils/formatter.js";
 import { withTyping } from "../utils/typing.js";
 import { getMultiSessionManager } from "../sessions/multiSession.js";
 import { checkPromptInjection } from "../utils/promptGuard.js";
+import { processAttachments, buildFilePrompt, type UploadResult } from "../utils/fileUpload.js";
 
 /**
  * 명령어 인자에서 세션 이름과 메시지 분리
@@ -56,15 +57,36 @@ const askCommand: PrefixCommand = {
 
     const { sessionName, message: msg } = parseAskArgs(ctx.args);
 
-    if (!msg) {
+    // 첨부파일 처리
+    let uploadedFiles: UploadResult[] = [];
+    const attachments = [...ctx.message.attachments.values()];
+    if (attachments.length > 0) {
+      const { uploaded, errors } = await processAttachments(attachments, ctx.client.workingDir);
+      uploadedFiles = uploaded;
+
+      if (errors.length > 0) {
+        await ctx.message.reply(`⚠️ 일부 파일 업로드 실패:\n${errors.join("\n")}`);
+      }
+
+      if (uploaded.length > 0) {
+        const fileNames = uploaded.map((f) => f.fileName).join(", ");
+        await ctx.message.reply(`📁 파일 업로드 완료: ${fileNames}`);
+      }
+    }
+
+    // 메시지가 없고 첨부파일도 없으면 에러
+    if (!msg && uploadedFiles.length === 0) {
       await ctx.message.reply(
-        "Usage: `!ask [session] <message>`\nExample: `!a hello` or `!a work \"analyze this code\"`",
+        "Usage: `!ask [session] <message>`\nExample: `!a hello` or `!a work \"analyze this code\"`\n💡 파일을 첨부해서 보낼 수도 있습니다!",
       );
       return;
     }
 
+    // 첨부파일 정보를 프롬프트에 포함
+    const finalMessage = buildFilePrompt(uploadedFiles, msg);
+
     // Prompt injection warning (non-blocking)
-    const injectionCheck = checkPromptInjection(msg);
+    const injectionCheck = checkPromptInjection(finalMessage);
     if (injectionCheck.detected) {
       await ctx.message.reply(
         `**[Security Warning]** Suspicious prompt pattern detected: ${injectionCheck.warnings.join(", ")}. Proceeding with caution.`,
@@ -104,7 +126,7 @@ const askCommand: PrefixCommand = {
 
     try {
       const result = await withTyping(ctx.message, () =>
-        multiSession.sendMessage(sessionName, msg, ctx.message),
+        multiSession.sendMessage(sessionName, finalMessage, ctx.message),
       );
 
       const prefix =

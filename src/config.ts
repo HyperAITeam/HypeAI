@@ -105,3 +105,27 @@ export const BLOCKED_COMMANDS = new Set([
 
 // Discord message limit
 export const DISCORD_MAX_LENGTH = 2000;
+
+// File upload settings
+export const FILE_UPLOAD = {
+  /** Maximum file size in bytes (default: 10MB) */
+  maxSize: 10 * 1024 * 1024,
+  /** Allowed file extensions (lowercase, with dot) */
+  allowedExtensions: new Set([
+    // Code files
+    ".js", ".ts", ".jsx", ".tsx", ".py", ".java", ".c", ".cpp", ".h", ".hpp",
+    ".cs", ".go", ".rs", ".rb", ".php", ".swift", ".kt", ".scala", ".lua",
+    // Web files
+    ".html", ".css", ".scss", ".sass", ".less", ".vue", ".svelte",
+    // Config/Data files
+    ".json", ".yaml", ".yml", ".toml", ".xml", ".ini", ".env", ".conf",
+    // Documentation
+    ".md", ".txt", ".rst", ".log",
+    // Shell scripts
+    ".sh", ".bash", ".zsh", ".bat", ".ps1", ".cmd",
+    // Other
+    ".sql", ".graphql", ".dockerfile", ".gitignore", ".editorconfig",
+  ]),
+  /** Upload folder name (relative to working directory) */
+  uploadFolder: "uploads",
+};
