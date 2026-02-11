@@ -145,7 +145,9 @@ notepad .env
 # [필수] Discord 봇 토큰 (2단계에서 복사한 값)
 DISCORD_BOT_TOKEN=여기에_봇_토큰_붙여넣기
 
-# [필수] 허가된 Discord 유저 ID (여러 명이면 쉼표로 구분)
+# [필수] 허가된 Discord 유저 ID (17-19자리 숫자, 여러 명이면 쉼표로 구분)
+# ⚠️ 반드시 숫자 ID를 사용하세요! (유저네임 ❌)
+# ⚠️ ID는 외부에 절대 노출하지 마세요!
 ALLOWED_USER_IDS=123456789012345678
 
 # [선택] Anthropic API 키 (claude login 사용 시 불필요)
@@ -166,11 +168,14 @@ AI_CLI_TIMEOUT=300
 | 변수 | 필수 | 기본값 | 설명 |
 |------|:----:|--------|------|
 | `DISCORD_BOT_TOKEN` | O | — | Discord 봇 토큰 |
-| `ALLOWED_USER_IDS` | O | — | 봇 사용 허가 유저 ID (쉼표 구분) |
+| `ALLOWED_USER_IDS` | O | — | 봇 사용 허가 유저 ID (17-19자리 숫자, 쉼표 구분) |
 | `ANTHROPIC_API_KEY` | | — | Anthropic API 키 (`claude login` 사용 시 불필요) |
 | `COMMAND_PREFIX` | | `!` | 명령어 접두사 |
 | `COMMAND_TIMEOUT` | | `30` | `!exec` 명령 타임아웃 (초) |
 | `AI_CLI_TIMEOUT` | | `300` | AI CLI 응답 타임아웃 (초) |
+
+> ⚠️ **보안 주의**: Discord ID는 17-19자리 **숫자**만 사용해야 합니다 (유저네임 ❌).
+> ID가 외부에 노출되면 스팸, 피싱 등의 타겟이 될 수 있으니 **절대 공개하지 마세요!**
 
 ---
 
