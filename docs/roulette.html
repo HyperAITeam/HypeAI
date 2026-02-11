@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Random Supporter Roulette</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: white;
+      overflow: hidden;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+      font-size: 1.8rem;
+      text-shadow: 0 0 20px rgba(255, 221, 0, 0.5);
+    }
+
+    .subtitle {
+      margin-bottom: 40px;
+      opacity: 0.7;
+      font-size: 0.95rem;
+    }
+
+    .roulette-container {
+      position: relative;
+      width: 320px;
+      height: 320px;
+    }
+
+    .wheel {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      position: relative;
+      transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99);
+      box-shadow:
+        0 0 0 8px #FFDD00,
+        0 0 0 12px #1a1a2e,
+        0 0 40px rgba(255, 221, 0, 0.4);
+    }
+
+    .wheel-segment {
+      position: absolute;
+      width: 50%;
+      height: 50%;
+      top: 0;
+      right: 0;
+      transform-origin: bottom left;
+      overflow: hidden;
+    }
+
+    .wheel-segment:nth-child(1) { transform: rotate(0deg) skewY(30deg); }
+    .wheel-segment:nth-child(2) { transform: rotate(120deg) skewY(30deg); }
+    .wheel-segment:nth-child(3) { transform: rotate(240deg) skewY(30deg); }
+
+    .wheel-segment .content {
+      position: absolute;
+      left: -100%;
+      width: 200%;
+      height: 200%;
+      transform: skewY(-30deg) rotate(15deg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding-top: 20px;
+      padding-right: 60px;
+    }
+
+    .wheel-segment:nth-child(1) .content { background: linear-gradient(135deg, #FF6B6B, #ee5a5a); }
+    .wheel-segment:nth-child(2) .content { background: linear-gradient(135deg, #4ECDC4, #44a8a1); }
+    .wheel-segment:nth-child(3) .content { background: linear-gradient(135deg, #FFE66D, #f0d85e); }
+
+    .wheel-segment .name {
+      font-weight: bold;
+      font-size: 0.9rem;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+      color: white;
+    }
+
+    .wheel-segment:nth-child(3) .name {
+      color: #333;
+    }
+
+    .center-circle {
+      position: absolute;
+      width: 70px;
+      height: 70px;
+      background: linear-gradient(135deg, #FFDD00, #FFA500);
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      z-index: 10;
+    }
+
+    .pointer {
+      position: absolute;
+      top: -15px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 18px solid transparent;
+      border-right: 18px solid transparent;
+      border-top: 35px solid #FFDD00;
+      filter: drop-shadow(0 3px 6px rgba(0,0,0,0.4));
+      z-index: 20;
+    }
+
+    .spin-btn {
+      margin-top: 40px;
+      padding: 18px 50px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      background: linear-gradient(135deg, #FFDD00, #FFA500);
+      color: #1a1a2e;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 6px 20px rgba(255, 221, 0, 0.4);
+    }
+
+    .spin-btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 30px rgba(255, 221, 0, 0.5);
+    }
+
+    .spin-btn:active {
+      transform: translateY(0);
+    }
+
+    .spin-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .result {
+      margin-top: 25px;
+      font-size: 1.3rem;
+      min-height: 40px;
+      text-align: center;
+    }
+
+    .result.winner {
+      animation: pulse 0.5s ease-in-out 3;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+
+    .confetti {
+      position: fixed;
+      width: 10px;
+      height: 10px;
+      top: -10px;
+      animation: fall 3s linear forwards;
+    }
+
+    @keyframes fall {
+      to {
+        transform: translateY(100vh) rotate(720deg);
+        opacity: 0;
+      }
+    }
+
+    .footer {
+      position: fixed;
+      bottom: 20px;
+      opacity: 0.5;
+      font-size: 0.8rem;
+    }
+
+    .footer a {
+      color: #FFDD00;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Random Supporter Roulette</h1>
+  <p class="subtitle">Click to support a random maintainer!</p>
+
+  <div class="roulette-container">
+    <div class="pointer"></div>
+    <div class="wheel" id="wheel">
+      <div class="wheel-segment">
+        <div class="content"><span class="name">hamsik2rang</span></div>
+      </div>
+      <div class="wheel-segment">
+        <div class="content"><span class="name">osgood</span></div>
+      </div>
+      <div class="wheel-segment">
+        <div class="content"><span class="name">0814jyinjs</span></div>
+      </div>
+      <div class="center-circle"></div>
+    </div>
+  </div>
+
+  <button class="spin-btn" id="spinBtn">SPIN!</button>
+  <div class="result" id="result"></div>
+
+  <div class="footer">
+    <a href="https://github.com/HyperAITeam/HypeAI">Back to HypeAI</a>
+  </div>
+
+  <script>
+    const supporters = [
+      { name: 'hamsik2rang', url: 'https://buymeacoffee.com/hamsik2rang', angle: 0 },
+      { name: 'osgood', url: 'https://buymeacoffee.com/osgoodyz', angle: 120 },
+      { name: '0814jyinjs', url: 'https://buymeacoffee.com/zx4510vbm', angle: 240 }
+    ];
+
+    const wheel = document.getElementById('wheel');
+    const spinBtn = document.getElementById('spinBtn');
+    const result = document.getElementById('result');
+    let currentRotation = 0;
+    let isSpinning = false;
+
+    function createConfetti() {
+      const colors = ['#FF6B6B', '#4ECDC4', '#FFE66D', '#FFDD00', '#FFA500'];
+      for (let i = 0; i < 50; i++) {
+        setTimeout(() => {
+          const confetti = document.createElement('div');
+          confetti.className = 'confetti';
+          confetti.style.left = Math.random() * 100 + 'vw';
+          confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+          confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+          document.body.appendChild(confetti);
+          setTimeout(() => confetti.remove(), 3000);
+        }, i * 30);
+      }
+    }
+
+    function spin() {
+      if (isSpinning) return;
+      isSpinning = true;
+      spinBtn.disabled = true;
+      result.textContent = '';
+      result.classList.remove('winner');
+
+      // Random winner
+      const winnerIndex = Math.floor(Math.random() * supporters.length);
+      const winner = supporters[winnerIndex];
+
+      // Calculate rotation (5-8 full spins + offset to land on winner)
+      const spins = 5 + Math.floor(Math.random() * 3);
+      const targetAngle = 360 - winner.angle - 60 + Math.random() * 40; // Center of segment
+      const totalRotation = currentRotation + (spins * 360) + targetAngle;
+
+      currentRotation = totalRotation;
+      wheel.style.transform = `rotate(${totalRotation}deg)`;
+
+      // Show result after spin
+      setTimeout(() => {
+        createConfetti();
+        result.innerHTML = `<strong>${winner.name}</strong> selected!<br>Redirecting...`;
+        result.classList.add('winner');
+
+        setTimeout(() => {
+          window.location.href = winner.url;
+        }, 1500);
+      }, 4000);
+    }
+
+    spinBtn.addEventListener('click', spin);
+
+    // Auto-spin on page load (optional - comment out if not wanted)
+    // setTimeout(spin, 500);
+  </script>
+</body>
+</html>
