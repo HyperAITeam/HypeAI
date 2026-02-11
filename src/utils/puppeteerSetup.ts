@@ -1,9 +1,13 @@
 import path from "node:path";
 import fs from "node:fs";
+import https from "node:https";
 import { execSync, spawn } from "node:child_process";
 
 // pkg 환경인지 확인
 declare const process: NodeJS.Process & { pkg?: unknown };
+
+const CHROME_FOR_TESTING_JSON =
+  "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json";
 
 // Chromium 설치 경로 (exe와 같은 폴더의 .chromium)
 function getChromiumPath(): string {
@@ -59,6 +63,23 @@ export function isChromiumInstalled(): boolean {
   return executable !== null;
 }
 
+// 시스템에 설치된 Chrome 찾기
+function findSystemChrome(): string | null {
+  const candidates = [
+    path.join(process.env.PROGRAMFILES || "C:\\Program Files", "Google", "Chrome", "Application", "chrome.exe"),
+    path.join(process.env["PROGRAMFILES(X86)"] || "C:\\Program Files (x86)", "Google", "Chrome", "Application", "chrome.exe"),
+    path.join(process.env.LOCALAPPDATA || "", "Google", "Chrome", "Application", "chrome.exe"),
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 // npx를 사용하여 Chromium 다운로드
 async function downloadWithNpx(chromiumDir: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -87,6 +108,170 @@ async function downloadWithNpx(chromiumDir: string): Promise<void> {
 
     child.on("error", reject);
   });
+}
+
+// HTTPS JSON 가져오기
+function fetchJson(url: string): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const request = (targetUrl: string, redirectCount = 0) => {
+      if (redirectCount > 5) {
+        reject(new Error("Too many redirects"));
+        return;
+      }
+
+      https.get(targetUrl, (res) => {
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          res.resume();
+          request(res.headers.location, redirectCount + 1);
+          return;
+        }
+
+        if (res.statusCode !== 200) {
+          res.resume();
+          reject(new Error(`HTTP ${res.statusCode}`));
+          return;
+        }
+
+        let data = "";
+        res.on("data", (chunk: Buffer) => { data += chunk.toString(); });
+        res.on("end", () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (err) {
+            reject(err);
+          }
+        });
+      }).on("error", reject);
+    };
+
+    request(url);
+  });
+}
+
+// HTTPS 파일 다운로드 (진행률 표시)
+function downloadFile(url: string, dest: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tmpDest = dest + ".tmp";
+
+    const request = (targetUrl: string, redirectCount = 0) => {
+      if (redirectCount > 5) {
+        reject(new Error("Too many redirects"));
+        return;
+      }
+
+      https.get(targetUrl, (res) => {
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          res.resume();
+          request(res.headers.location, redirectCount + 1);
+          return;
+        }
+
+        if (res.statusCode !== 200) {
+          res.resume();
+          reject(new Error(`Download failed: HTTP ${res.statusCode}`));
+          return;
+        }
+
+        const totalBytes = parseInt(res.headers["content-length"] ?? "0", 10);
+        let downloaded = 0;
+        let lastPercent = -1;
+
+        const file = fs.createWriteStream(tmpDest);
+
+        res.on("data", (chunk: Buffer) => {
+          downloaded += chunk.length;
+          if (totalBytes > 0) {
+            const percent = Math.floor((downloaded / totalBytes) * 100);
+            if (percent !== lastPercent && percent % 10 === 0) {
+              lastPercent = percent;
+              const mb = (downloaded / 1024 / 1024).toFixed(1);
+              const totalMb = (totalBytes / 1024 / 1024).toFixed(1);
+              process.stdout.write(`\r[Puppeteer] Downloading... ${mb}MB / ${totalMb}MB (${percent}%)`);
+            }
+          }
+        });
+
+        res.pipe(file);
+
+        file.on("finish", () => {
+          file.close(() => {
+            process.stdout.write("\n");
+            try {
+              if (fs.existsSync(dest)) fs.unlinkSync(dest);
+              fs.renameSync(tmpDest, dest);
+              resolve();
+            } catch (err) {
+              reject(err);
+            }
+          });
+        });
+
+        file.on("error", (err) => {
+          fs.unlink(tmpDest, () => {});
+          reject(err);
+        });
+      }).on("error", (err) => {
+        fs.unlink(tmpDest, () => {});
+        reject(err);
+      });
+    };
+
+    request(url);
+  });
+}
+
+// Chrome for Testing API에서 chrome-headless-shell 직접 다운로드
+async function downloadDirect(chromiumDir: string): Promise<void> {
+  console.log("[Puppeteer] Fetching Chrome for Testing download URL...");
+
+  const json = await fetchJson(CHROME_FOR_TESTING_JSON) as {
+    channels: {
+      Stable: {
+        version: string;
+        downloads: {
+          "chrome-headless-shell"?: Array<{ platform: string; url: string }>;
+        };
+      };
+    };
+  };
+
+  const downloads = json.channels.Stable.downloads["chrome-headless-shell"];
+  if (!downloads) {
+    throw new Error("chrome-headless-shell downloads not found in API response");
+  }
+
+  const win64 = downloads.find((d) => d.platform === "win64");
+  if (!win64) {
+    throw new Error("win64 platform not found in chrome-headless-shell downloads");
+  }
+
+  const version = json.channels.Stable.version;
+  console.log(`[Puppeteer] Downloading chrome-headless-shell v${version} (win64)...`);
+
+  const zipPath = path.join(chromiumDir, "chrome-headless-shell.zip");
+
+  // chromium 폴더 생성
+  if (!fs.existsSync(chromiumDir)) {
+    fs.mkdirSync(chromiumDir, { recursive: true });
+  }
+
+  await downloadFile(win64.url, zipPath);
+  console.log("[Puppeteer] Download complete. Extracting...");
+
+  // PowerShell Expand-Archive로 ZIP 해제
+  execSync(
+    `powershell -NoProfile -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${chromiumDir}' -Force"`,
+    { stdio: "inherit" },
+  );
+
+  // ZIP 파일 정리
+  try {
+    fs.unlinkSync(zipPath);
+  } catch {
+    // ignore
+  }
+
+  console.log("[Puppeteer] Extraction complete!");
 }
 
 // Puppeteer 내장 브라우저 사용 시도
@@ -131,62 +316,73 @@ function tryPuppeteerCache(): string | null {
 
 // Chromium 다운로드 및 설치
 export async function ensureChromium(): Promise<string> {
+  // 1. CHROMIUM_PATH 환경변수
+  const envPath = process.env.CHROMIUM_PATH;
+  if (envPath && fs.existsSync(envPath)) {
+    console.log(`[Puppeteer] Using CHROMIUM_PATH: ${envPath}`);
+    return envPath;
+  }
+
   const chromiumDir = getChromiumPath();
 
-  // 1. 이미 우리 폴더에 설치되어 있으면 사용
+  // 2. 이미 .chromium 폴더에 설치되어 있으면 사용
   let executable = findChromiumExecutable(chromiumDir);
   if (executable) {
     console.log(`[Puppeteer] Chromium found: ${executable}`);
     return executable;
   }
 
-  // 2. Puppeteer 캐시에서 찾기
+  // 3. Puppeteer 캐시에서 찾기
   const cachedChrome = tryPuppeteerCache();
   if (cachedChrome) {
     console.log(`[Puppeteer] Using cached Chromium: ${cachedChrome}`);
     return cachedChrome;
   }
 
-  // 3. 다운로드 필요
+  // 4. 시스템 Chrome 설치 경로 탐색
+  const systemChrome = findSystemChrome();
+  if (systemChrome) {
+    console.log(`[Puppeteer] Using system Chrome: ${systemChrome}`);
+    return systemChrome;
+  }
+
+  // 5. HTTPS 직접 다운로드 (npx 불필요)
   console.log(`[Puppeteer] Chromium not found. Downloading to ${chromiumDir}...`);
   console.log("[Puppeteer] This may take a few minutes on first run.");
 
-  // chromium 폴더 생성
+  try {
+    await downloadDirect(chromiumDir);
+    console.log("[Puppeteer] Direct download complete!");
+
+    executable = findChromiumExecutable(chromiumDir);
+    if (executable) {
+      return executable;
+    }
+
+    throw new Error("Direct download completed but executable not found");
+  } catch (directError) {
+    console.warn("[Puppeteer] Direct download failed:", directError);
+    console.log("[Puppeteer] Falling back to npx...");
+  }
+
+  // 6. npx fallback (최후 수단)
   if (!fs.existsSync(chromiumDir)) {
     fs.mkdirSync(chromiumDir, { recursive: true });
   }
 
   try {
     await downloadWithNpx(chromiumDir);
-    console.log("[Puppeteer] Download complete!");
+    console.log("[Puppeteer] npx download complete!");
 
-    // 다운로드 후 다시 찾기
     executable = findChromiumExecutable(chromiumDir);
     if (executable) {
       return executable;
     }
 
-    throw new Error("Chromium download completed but executable not found");
-  } catch (error) {
-    console.error("[Puppeteer] Failed to download Chromium:", error);
-    console.log("[Puppeteer] Trying fallback: manual puppeteer install...");
-
-    // Fallback: puppeteer browsers 직접 설치 시도
-    try {
-      execSync("npx puppeteer browsers install chrome-headless-shell", {
-        stdio: "inherit",
-        cwd: path.dirname(chromiumDir),
-      });
-
-      const fallbackExe = tryPuppeteerCache();
-      if (fallbackExe) {
-        return fallbackExe;
-      }
-    } catch (fallbackError) {
-      console.error("[Puppeteer] Fallback also failed:", fallbackError);
-    }
-
-    throw error;
+    throw new Error("npx download completed but executable not found");
+  } catch (npxError) {
+    console.error("[Puppeteer] npx fallback also failed:", npxError);
+    throw npxError;
   }
 }
 
