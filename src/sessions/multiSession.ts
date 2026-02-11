@@ -173,6 +173,7 @@ export class MultiSessionManager {
     sessionName: string | null,
     message: string,
     discordMessage: Message,
+    onProgress?: (status: string) => void,
   ): Promise<string> {
     const targetName = sessionName ?? this.activeSessionName;
     let session = this.sessions.get(targetName);
@@ -198,7 +199,7 @@ export class MultiSessionManager {
     // Use session-specific cwd for security context
     const sessionCwd = session.cwd;
     const wrappedMessage = wrapWithSecurityContext(message, sessionCwd);
-    const result = await session.manager.sendMessage(wrappedMessage, discordMessage);
+    const result = await session.manager.sendMessage(wrappedMessage, discordMessage, onProgress);
     this.schedulePersist();
     return result;
   }
