@@ -51,6 +51,15 @@ const helpCommand: PrefixCommand = {
           inline: false,
         },
         {
+          name: "Git Tools",
+          value: [
+            `\`${p}diff\` — Show git diff as image (aliases: \`${p}d\`, \`${p}changes\`)`,
+            `\`${p}diff --staged\` — Show staged changes only`,
+            `\`${p}diff <file>\` — Show diff for specific file`,
+          ].join("\n"),
+          inline: false,
+        },
+        {
           name: "CMD Execution",
           value: `\`${p}exec <command>\` — Run a CMD command (aliases: \`${p}run\`, \`${p}cmd\`)`,
           inline: false,
