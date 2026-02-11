@@ -80,6 +80,7 @@ export interface SessionInfo {
 export interface NamedSession {
   name: string; // 세션 이름 (예: "work", "default")
   cliName: string; // CLI 도구 (예: "claude", "opencode")
+  cwd: string; // 세션별 작업 디렉터리
   manager: ISessionManager; // 실제 세션 매니저
   createdAt: number; // 생성 시간
   lastUsedAt: number; // 마지막 사용 시간
@@ -105,4 +106,6 @@ export interface ISessionManager {
   cleanup(): Promise<void>;
   getPersistedState(): PersistedSessionState;
   restoreFromState(state: PersistedSessionState): void;
+  /** Get current working directory for this session */
+  getCwd(): string;
 }

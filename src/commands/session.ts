@@ -9,7 +9,7 @@ import { audit, AuditEvent } from "../utils/auditLog.js";
 const sessionCommand: PrefixCommand = {
   name: "session",
   aliases: ["s"],
-  description: "Session management (info / create / list / delete / new / kill / switch / stats / history).",
+  description: "Session management (info / create / list / delete / new / kill / switch / stats / history / cwd).",
 
   async execute(ctx: CommandContext): Promise<void> {
     if (!isAllowedUser(ctx.message.author.id)) {
@@ -45,6 +45,9 @@ const sessionCommand: PrefixCommand = {
       case "hist":
       case "h":
         return handleHistory(ctx);
+      case "cwd":
+      case "dir":
+        return handleCwd(ctx);
       case "info":
       default:
         return handleInfo(ctx);
@@ -53,8 +56,8 @@ const sessionCommand: PrefixCommand = {
 };
 
 /**
- * !session create <name> [cli]
- * 새 세션 생성
+ * !session create <name> [cli] [cwd]
+ * 새 세션 생성 (선택적으로 작업 디렉터리 지정 가능)
  */
 async function handleCreate(ctx: CommandContext): Promise<void> {
   const multiSession = getMultiSessionManager();
@@ -64,20 +67,44 @@ async function handleCreate(ctx: CommandContext): Promise<void> {
   }
 
   const name = ctx.args[1];
-  const cliName = ctx.args[2]?.toLowerCase() ?? ctx.client.selectedCli;
 
   if (!name) {
-    await ctx.message.reply("Usage: `!session create <name> [cli]`\nExample: `!session create work opencode`");
+    await ctx.message.reply(
+      "Usage: `!session create <name> [cli] [cwd]`\n" +
+      "Example: `!session create work claude`\n" +
+      "Example: `!session create hsmr claude D:\\SubDev\\HSMR`"
+    );
     return;
   }
 
+  // Parse CLI name and optional cwd
+  // If args[2] looks like a path, treat it as cwd and use default CLI
+  // Otherwise treat it as CLI name and args[3+] as cwd
+  let cliName = ctx.client.selectedCli;
+  let cwd: string | undefined;
+
+  const arg2 = ctx.args[2];
+  if (arg2) {
+    // Check if arg2 is a known CLI or a path
+    if (CLI_TOOLS[arg2.toLowerCase()]) {
+      cliName = arg2.toLowerCase();
+      // Join remaining args as cwd (in case path has spaces)
+      if (ctx.args[3]) {
+        cwd = ctx.args.slice(3).join(" ");
+      }
+    } else {
+      // arg2 is not a CLI, treat arg2 onwards as cwd
+      cwd = ctx.args.slice(2).join(" ");
+    }
+  }
+
   try {
-    const session = multiSession.createSession(name, cliName);
+    const session = multiSession.createSession(name, cliName, cwd);
     const tool = CLI_TOOLS[cliName];
 
     audit(AuditEvent.SESSION_CREATED, ctx.message.author.id, {
       sessionName: name,
-      details: { cli: cliName },
+      details: { cli: cliName, cwd: session.cwd },
     });
 
     const embed = new EmbedBuilder()
@@ -86,6 +113,7 @@ async function handleCreate(ctx: CommandContext): Promise<void> {
       .addFields(
         { name: "Name", value: `\`${session.name}\``, inline: true },
         { name: "CLI", value: tool.name, inline: true },
+        { name: "Working Directory", value: `\`${session.cwd}\``, inline: false },
       )
       .setFooter({ text: `Use: !a ${name} "message" or !session switch ${name}` });
 
@@ -448,6 +476,40 @@ async function handleInfo(ctx: CommandContext): Promise<void> {
       inline: false,
     });
   }
+
+  await ctx.message.reply({ embeds: [embed] });
+}
+
+/**
+ * !session cwd [name]
+ * 세션의 작업 디렉터리 확인
+ */
+async function handleCwd(ctx: CommandContext): Promise<void> {
+  const multiSession = getMultiSessionManager();
+  if (!multiSession) {
+    await ctx.message.reply("Session manager not initialized.");
+    return;
+  }
+
+  const name = ctx.args[1] ?? multiSession.getActiveSessionName();
+  const session = multiSession.getSession(name);
+
+  if (!session) {
+    await ctx.message.reply(`Session '${name}' not found.`);
+    return;
+  }
+
+  const isActive = name === multiSession.getActiveSessionName();
+  const tool = CLI_TOOLS[session.cliName];
+
+  const embed = new EmbedBuilder()
+    .setTitle(`Working Directory: ${name}${isActive ? " (active)" : ""}`)
+    .setColor(0x5865F2)
+    .addFields(
+      { name: "CLI", value: tool.name, inline: true },
+      { name: "Path", value: `\`${session.cwd}\``, inline: false },
+    )
+    .setFooter({ text: "To change cwd, create a new session with: !session create <name> <cli> <path>" });
 
   await ctx.message.reply({ embeds: [embed] });
 }

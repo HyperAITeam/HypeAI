@@ -239,6 +239,10 @@ export class SubprocessSessionManager implements ISessionManager {
     this.proc = null;
   }
 
+  getCwd(): string {
+    return this.cwd;
+  }
+
   // --- internals ---
 
   private buildCommand(message: string): string[] {

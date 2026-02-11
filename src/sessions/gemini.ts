@@ -318,6 +318,10 @@ export class GeminiSessionManager implements ISessionManager {
     this.proc = null;
   }
 
+  getCwd(): string {
+    return this.cwd;
+  }
+
   // --- Private methods ---
 
   private buildCommand(message: string): string[] {

@@ -12,6 +12,7 @@ import {
   type PersistedSession,
 } from "../utils/sessionStore.js";
 import { audit, AuditEvent } from "../utils/auditLog.js";
+import { validateWorkingDir, getDefaultAllowedRoot } from "../utils/pathValidator.js";
 
 /**
  * 멀티 세션 매니저
@@ -37,9 +38,20 @@ export class MultiSessionManager {
   }
 
   /**
-   * 새 세션 생성
+   * Get allowed root directories for path validation.
+   * By default, allows sibling directories of the initial workingDir.
    */
-  createSession(name: string, cliName: string): NamedSession {
+  private getAllowedRoots(): string[] {
+    return [getDefaultAllowedRoot(this.workingDir)];
+  }
+
+  /**
+   * 새 세션 생성
+   * @param name - 세션 이름
+   * @param cliName - CLI 도구 이름 (claude, gemini, opencode)
+   * @param cwd - 작업 디렉터리 (선택, 미지정 시 기본 workingDir 사용)
+   */
+  createSession(name: string, cliName: string, cwd?: string): NamedSession {
     if (!this.isValidSessionName(name)) {
       throw new Error(
         `Invalid session name: '${name}'. Use only letters, numbers, hyphens, underscores (max 32 chars).`,
@@ -55,11 +67,22 @@ export class MultiSessionManager {
       throw new Error(`Unknown CLI: '${cliName}'. Available: ${available}`);
     }
 
-    const manager = createSession(cliName, this.workingDir);
+    // Validate and normalize the working directory
+    let sessionCwd = this.workingDir;
+    if (cwd) {
+      const validation = validateWorkingDir(cwd, this.workingDir, this.getAllowedRoots());
+      if (!validation.valid) {
+        throw new Error(`Invalid working directory: ${validation.error}`);
+      }
+      sessionCwd = validation.normalizedPath;
+    }
+
+    const manager = createSession(cliName, sessionCwd);
 
     const namedSession: NamedSession = {
       name,
       cliName,
+      cwd: sessionCwd,
       manager,
       createdAt: Date.now(),
       lastUsedAt: Date.now(),
@@ -172,7 +195,9 @@ export class MultiSessionManager {
     }
 
     session.lastUsedAt = Date.now();
-    const wrappedMessage = wrapWithSecurityContext(message, this.workingDir);
+    // Use session-specific cwd for security context
+    const sessionCwd = session.cwd;
+    const wrappedMessage = wrapWithSecurityContext(message, sessionCwd);
     const result = await session.manager.sendMessage(wrappedMessage, discordMessage);
     this.schedulePersist();
     return result;
@@ -234,6 +259,7 @@ export class MultiSessionManager {
       sessions.push({
         name: ns.name,
         cliName: ns.cliName,
+        cwd: ns.cwd,
         sessionId: state.sessionId,
         createdAt: ns.createdAt,
         lastUsedAt: ns.lastUsedAt,
@@ -272,7 +298,17 @@ export class MultiSessionManager {
       if (this.sessions.has(ps.name)) continue;
 
       try {
-        const manager = createSession(ps.cliName, this.workingDir);
+        // Validate persisted cwd, fall back to default workingDir if invalid
+        let sessionCwd = ps.cwd || this.workingDir;
+        const validation = validateWorkingDir(sessionCwd, this.workingDir, this.getAllowedRoots());
+        if (!validation.valid) {
+          console.warn(`  [persist] Session '${ps.name}' cwd invalid (${validation.error}), using default`);
+          sessionCwd = this.workingDir;
+        } else {
+          sessionCwd = validation.normalizedPath;
+        }
+
+        const manager = createSession(ps.cliName, sessionCwd);
         manager.restoreFromState({
           sessionId: ps.sessionId,
           messageCount: ps.messageCount,
@@ -285,6 +321,7 @@ export class MultiSessionManager {
         const namedSession: NamedSession = {
           name: ps.name,
           cliName: ps.cliName,
+          cwd: sessionCwd,
           manager,
           createdAt: ps.createdAt,
           lastUsedAt: ps.lastUsedAt,

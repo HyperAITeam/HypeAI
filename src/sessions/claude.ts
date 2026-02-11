@@ -297,4 +297,8 @@ export class ClaudeSessionManager implements ISessionManager {
   async cleanup(): Promise<void> {
     await this.kill();
   }
+
+  getCwd(): string {
+    return this.cwd;
+  }
 }

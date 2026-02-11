@@ -5,6 +5,7 @@ import type { HistoryEntry } from "../types.js";
 export interface PersistedSession {
   name: string;
   cliName: string;
+  cwd: string; // Session-specific working directory
   sessionId: string | null;
   createdAt: number;
   lastUsedAt: number;
