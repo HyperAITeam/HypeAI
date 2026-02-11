@@ -2,6 +2,7 @@
 const diff2htmlModule = require("diff2html") as { html: (diff: string, config?: object) => string };
 const { html: diff2html } = diff2htmlModule;
 import puppeteer, { type Browser } from "puppeteer";
+import { ensureChromium, isChromiumInstalled } from "./puppeteerSetup.js";
 
 export interface RenderOptions {
   theme?: "light" | "dark";
@@ -12,14 +13,38 @@ export interface RenderOptions {
 
 // Singleton browser instance for performance
 let browserInstance: Browser | null = null;
+let chromiumPath: string | null = null;
+
+/**
+ * Initialize Chromium (downloads if needed)
+ * Call this early to avoid delay on first diff render
+ */
+export async function initializePuppeteer(): Promise<void> {
+  if (!chromiumPath) {
+    chromiumPath = await ensureChromium();
+  }
+}
+
+/**
+ * Check if Chromium is ready
+ */
+export function isPuppeteerReady(): boolean {
+  return isChromiumInstalled();
+}
 
 /**
  * Get or create puppeteer browser instance
  */
 async function getBrowser(): Promise<Browser> {
   if (!browserInstance || !browserInstance.connected) {
+    // Chromium이 없으면 다운로드
+    if (!chromiumPath) {
+      chromiumPath = await ensureChromium();
+    }
+
     browserInstance = await puppeteer.launch({
       headless: true,
+      executablePath: chromiumPath,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
