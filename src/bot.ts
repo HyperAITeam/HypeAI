@@ -25,7 +25,7 @@ import {
   getMultiSessionManager,
 } from "./sessions/multiSession.js";
 import { sanitizeOutput } from "./utils/sanitizeOutput.js";
-import { closeBrowser } from "./utils/diffRenderer.js";
+import { closeBrowser, initializePuppeteer } from "./utils/diffRenderer.js";
 import { initAuditLogger, getAuditLogger, audit, AuditEvent } from "./utils/auditLog.js";
 import { initRateLimiter, getRateLimiter } from "./utils/rateLimiter.js";
 import { isAllowedUser } from "./utils/security.js";
@@ -478,6 +478,15 @@ async function main(): Promise<void> {
   };
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
+
+  // Pre-initialize Puppeteer (Chromium download) — non-blocking
+  try {
+    await initializePuppeteer();
+    console.log("  [puppeteer] Chromium ready");
+  } catch (err: any) {
+    console.warn(`  [puppeteer] Chromium init failed: ${err.message}`);
+    console.warn("  [puppeteer] !diff will fall back to text mode");
+  }
 
   await client.login(DISCORD_BOT_TOKEN);
 }

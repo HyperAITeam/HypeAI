@@ -1,6 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const diff2htmlModule = require("diff2html") as { html: (diff: string, config?: object) => string };
-const { html: diff2html } = diff2htmlModule;
+import { html as diff2html } from "diff2html";
 import puppeteer, { type Browser } from "puppeteer";
 import { ensureChromium, isChromiumInstalled } from "./puppeteerSetup.js";
 
