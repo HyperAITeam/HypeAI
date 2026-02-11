@@ -3,6 +3,7 @@ import type { ISessionManager } from "./types.js";
 import type { NamedSession } from "../types.js";
 import { CLI_TOOLS } from "../config.js";
 import { createSession } from "../bot.js";
+import { wrapWithSecurityContext } from "../utils/promptGuard.js";
 
 /**
  * 멀티 세션 매니저
@@ -161,7 +162,8 @@ export class MultiSessionManager {
     }
 
     session.lastUsedAt = Date.now();
-    return session.manager.sendMessage(message, discordMessage);
+    const wrappedMessage = wrapWithSecurityContext(message, this.workingDir);
+    return session.manager.sendMessage(wrappedMessage, discordMessage);
   }
 
   /**

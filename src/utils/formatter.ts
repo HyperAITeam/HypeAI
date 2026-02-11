@@ -1,5 +1,6 @@
 import { AttachmentBuilder, Message } from "discord.js";
 import { DISCORD_MAX_LENGTH } from "../config.js";
+import { sanitizeOutput } from "./sanitizeOutput.js";
 
 /** Combine stdout/stderr into a single result string. */
 export function formatOutput(
@@ -9,7 +10,7 @@ export function formatOutput(
 ): string {
   const parts: string[] = [];
   if (stdout.trim()) parts.push(stdout.trim());
-  if (stderr.trim()) parts.push(`[stderr]\n${stderr.trim()}`);
+  if (stderr.trim()) parts.push(`[stderr]\n${sanitizeOutput(stderr.trim())}`);
   if (code !== null && code !== 0) parts.push(`(exit code: ${code})`);
   return parts.length > 0 ? parts.join("\n") : "(no output)";
 }

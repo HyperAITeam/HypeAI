@@ -13,6 +13,7 @@ import {
 import { getMultiSessionManager } from "../sessions/multiSession.js";
 import { sendResult } from "../utils/formatter.js";
 import { withTyping } from "../utils/typing.js";
+import { checkPromptInjection } from "../utils/promptGuard.js";
 
 // 작업 실행 중단 플래그
 let isRunningTasks = false;
@@ -105,7 +106,15 @@ async function handleAdd(ctx: CommandContext, content: string): Promise<void> {
     return;
   }
 
-  const task = addTask(ctx.client.workingDir, content.trim());
+  // Prompt injection warning (non-blocking)
+  const injectionCheck = checkPromptInjection(content);
+  if (injectionCheck.detected) {
+    await ctx.message.reply(
+      `**[Security Warning]** Suspicious prompt pattern detected: ${injectionCheck.warnings.join(", ")}. Task will still be added.`,
+    );
+  }
+
+  const task = await addTask(ctx.client.workingDir, content.trim());
   await ctx.message.reply(`✅ 작업 추가됨 **[${task.id}]** ${task.content}`);
 }
 
@@ -122,7 +131,7 @@ async function handleRemove(ctx: CommandContext, idStr: string): Promise<void> {
     return;
   }
 
-  const removed = removeTask(ctx.client.workingDir, id);
+  const removed = await removeTask(ctx.client.workingDir, id);
   if (removed) {
     await ctx.message.reply(`🗑️ 작업 **[${id}]** 삭제됨`);
   } else {
@@ -131,7 +140,7 @@ async function handleRemove(ctx: CommandContext, idStr: string): Promise<void> {
 }
 
 async function handleClear(ctx: CommandContext): Promise<void> {
-  const count = clearTasks(ctx.client.workingDir);
+  const count = await clearTasks(ctx.client.workingDir);
   await ctx.message.reply(`🗑️ 대기 중인 작업 **${count}개** 삭제됨`);
 }
 
@@ -181,7 +190,7 @@ async function handleRun(ctx: CommandContext): Promise<void> {
     }
 
     const task = pendingTasks[i];
-    updateTaskStatus(ctx.client.workingDir, task.id, "running");
+    await updateTaskStatus(ctx.client.workingDir, task.id, "running");
 
     await channel.send(`\n**[${i + 1}/${pendingTasks.length}]** ${task.content}...`);
 
@@ -191,13 +200,13 @@ async function handleRun(ctx: CommandContext): Promise<void> {
         multiSession.sendMessage(null, task.content, ctx.message),
       );
 
-      updateTaskStatus(ctx.client.workingDir, task.id, "completed", result);
+      await updateTaskStatus(ctx.client.workingDir, task.id, "completed", result);
       completed++;
 
       // 결과 전송 (긴 경우 파일로)
       await sendResult(ctx.message, result, { prefix: `✅ **[${task.id}]** 완료` });
     } catch (err: any) {
-      updateTaskStatus(ctx.client.workingDir, task.id, "failed", err.message);
+      await updateTaskStatus(ctx.client.workingDir, task.id, "failed", err.message);
       failed++;
       await channel.send(`❌ **[${task.id}]** 실패: ${err.message}`);
     }

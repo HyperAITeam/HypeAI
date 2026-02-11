@@ -72,18 +72,15 @@ describe("Config", () => {
 
   describe("BLOCKED_COMMANDS", () => {
     const BLOCKED_COMMANDS = new Set([
-      "format",
-      "diskpart",
-      "shutdown",
-      "restart",
-      "del /s",
-      "rd /s",
-      "rmdir /s",
-      "reg delete",
-      "bcdedit",
-      "cipher /w",
-      "net user",
-      "net localgroup",
+      "format", "diskpart", "shutdown", "restart",
+      "del /s", "rd /s", "rmdir /s",
+      "reg delete", "bcdedit", "cipher /w",
+      "net user", "net localgroup",
+      "powershell", "pwsh", "cmd /c", "cmd.exe",
+      "wsl", "bash", "wmic",
+      "sc delete", "sc stop", "sc config",
+      "taskkill", "schtasks", "netsh",
+      "bootrec", "bcdboot", "setx", "erase /s",
     ]);
 
     it("should contain dangerous system commands", () => {
@@ -105,6 +102,25 @@ describe("Config", () => {
     it("should contain dangerous network commands", () => {
       expect(BLOCKED_COMMANDS.has("net user")).toBe(true);
       expect(BLOCKED_COMMANDS.has("net localgroup")).toBe(true);
+    });
+
+    it("should contain shell bypass commands", () => {
+      expect(BLOCKED_COMMANDS.has("powershell")).toBe(true);
+      expect(BLOCKED_COMMANDS.has("pwsh")).toBe(true);
+      expect(BLOCKED_COMMANDS.has("cmd /c")).toBe(true);
+      expect(BLOCKED_COMMANDS.has("cmd.exe")).toBe(true);
+      expect(BLOCKED_COMMANDS.has("wsl")).toBe(true);
+      expect(BLOCKED_COMMANDS.has("bash")).toBe(true);
+      expect(BLOCKED_COMMANDS.has("wmic")).toBe(true);
+    });
+
+    it("should contain service management commands", () => {
+      expect(BLOCKED_COMMANDS.has("sc delete")).toBe(true);
+      expect(BLOCKED_COMMANDS.has("sc stop")).toBe(true);
+      expect(BLOCKED_COMMANDS.has("sc config")).toBe(true);
+      expect(BLOCKED_COMMANDS.has("taskkill")).toBe(true);
+      expect(BLOCKED_COMMANDS.has("schtasks")).toBe(true);
+      expect(BLOCKED_COMMANDS.has("netsh")).toBe(true);
     });
   });
 
