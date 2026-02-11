@@ -140,6 +140,7 @@ export class MultiSessionManager {
     sessionName: string | null,
     message: string,
     discordMessage: Message,
+    onProgress?: (status: string) => void,
   ): Promise<string> {
     const targetName = sessionName ?? this.activeSessionName;
     let session = this.sessions.get(targetName);
@@ -163,7 +164,7 @@ export class MultiSessionManager {
 
     session.lastUsedAt = Date.now();
     const wrappedMessage = wrapWithSecurityContext(message, this.workingDir);
-    return session.manager.sendMessage(wrappedMessage, discordMessage);
+    return session.manager.sendMessage(wrappedMessage, discordMessage, onProgress);
   }
 
   /**
