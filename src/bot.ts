@@ -25,6 +25,7 @@ import {
   getMultiSessionManager,
 } from "./sessions/multiSession.js";
 import { sanitizeOutput } from "./utils/sanitizeOutput.js";
+import { closeBrowser } from "./utils/diffRenderer.js";
 import { initAuditLogger, getAuditLogger, audit, AuditEvent } from "./utils/auditLog.js";
 import { initRateLimiter, getRateLimiter } from "./utils/rateLimiter.js";
 import { isAllowedUser } from "./utils/security.js";
@@ -38,6 +39,7 @@ import statusCommand from "./commands/status.js";
 import helpCommand from "./commands/help.js";
 import myidCommand from "./commands/myid.js";
 import taskCommand from "./commands/task.js";
+import diffCommand from "./commands/diff.js";
 
 // ── Global error handlers (prevent silent crash in exe) ─────────────
 process.on("unhandledRejection", (reason) => {
@@ -220,6 +222,7 @@ const allCommands: PrefixCommand[] = [
   helpCommand,
   myidCommand,
   taskCommand,
+  diffCommand,
 ];
 
 function loadCommands(client: BotClient): void {
@@ -469,6 +472,7 @@ async function main(): Promise<void> {
     }
     const logger = getAuditLogger();
     if (logger) await logger.shutdown();
+    await closeBrowser(); // Close puppeteer browser
     client.destroy();
     process.exit(0);
   };

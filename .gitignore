@@ -15,9 +15,11 @@ GEMINI.md
 experiments/
 logs/
 nul
+.chromium/
+logs/
 
 # Session & Runtime Data
-hypeai-sessions.json
+.hypeai-sessions.json
 audit-logs/
 
 # Node.js auto-download (for pkg builds)
