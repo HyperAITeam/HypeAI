@@ -26,10 +26,11 @@ const helpCommand: PrefixCommand = {
           name: "AI CLI",
           value: [
             `\`${p}ask [session] <message>\` — Send message (alias: \`${p}a\`)`,
-            `\`${p}session create <name> [cli]\` — Create a new session (alias: \`${p}s c\`)`,
+            `\`${p}session create <name> [cli] [cwd]\` — Create session with optional working directory`,
             `\`${p}session list\` — List all sessions (alias: \`${p}s ls\`)`,
             `\`${p}session switch <name>\` — Switch active session (alias: \`${p}s sw\`)`,
             `\`${p}session info [name]\` — Show session info (alias: \`${p}s\`)`,
+            `\`${p}session cwd [name]\` — Show session working directory (alias: \`${p}s dir\`)`,
             `\`${p}session new [name]\` — Reset session conversation`,
             `\`${p}session kill [name]\` — Kill session process (alias: \`${p}s stop\`)`,
             `\`${p}session delete <name>\` — Delete session (alias: \`${p}s rm\`)`,
@@ -65,6 +66,11 @@ const helpCommand: PrefixCommand = {
           inline: false,
         },
       )
+      .addFields({
+        name: "Slash Commands",
+        value: "Slash commands (`/ask`, `/session`, `/exec`, `/task`, `/status`, `/help`) are also available if configured.",
+        inline: false,
+      })
       .setFooter({ text: "Only authorized users can use this bot." });
 
     await ctx.message.reply({ embeds: [embed] });

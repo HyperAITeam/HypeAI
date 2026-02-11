@@ -1,4 +1,4 @@
-import { AttachmentBuilder, Message } from "discord.js";
+import { AttachmentBuilder, Message, type ChatInputCommandInteraction } from "discord.js";
 import { DISCORD_MAX_LENGTH } from "../config.js";
 import { sanitizeOutput } from "./sanitizeOutput.js";
 
@@ -50,4 +50,37 @@ export async function sendResult(
     name: "output.txt",
   });
   await message.reply({ content: previewMsg, files: [file] });
+}
+
+/**
+ * Send a result via interaction.editReply, with file attachment for long output.
+ */
+export async function sendInteractionResult(
+  interaction: ChatInputCommandInteraction,
+  content: string,
+  options: { prefix?: string; lang?: string } = {},
+): Promise<void> {
+  const { prefix, lang } = options;
+  if (prefix) content = `${prefix}\n${content}`;
+
+  const wrapped = lang
+    ? `\`\`\`${lang}\n${content}\n\`\`\``
+    : `\`\`\`\n${content}\n\`\`\``;
+
+  if (wrapped.length <= DISCORD_MAX_LENGTH) {
+    await interaction.editReply(wrapped);
+    return;
+  }
+
+  const maxPreview = DISCORD_MAX_LENGTH - 200;
+  const preview = content.slice(0, maxPreview);
+  let previewMsg = `\`\`\`\n${preview}\n\`\`\`\n*(truncated — full output attached)*`;
+  if (previewMsg.length > DISCORD_MAX_LENGTH) {
+    previewMsg = "*(output too long — see attached file)*";
+  }
+
+  const file = new AttachmentBuilder(Buffer.from(content, "utf-8"), {
+    name: "output.txt",
+  });
+  await interaction.editReply({ content: previewMsg, files: [file] });
 }
