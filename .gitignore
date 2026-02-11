@@ -13,7 +13,18 @@ Test/
 CLAUDE.md
 GEMINI.md
 experiments/
+logs/
 nul
 .chromium/
-.hypeai-sessions.json
 logs/
+
+# Session & Runtime Data
+.hypeai-sessions.json
+audit-logs/
+
+# Node.js auto-download (for pkg builds)
+node.exe
+node.exe.tmp
+
+# Build artifacts
+*.cjs

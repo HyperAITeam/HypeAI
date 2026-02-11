@@ -4,6 +4,7 @@ import { isAllowedUser, isCommandBlocked } from "../utils/security.js";
 import { runCommand } from "../utils/subprocess.js";
 import { formatOutput, sendResult } from "../utils/formatter.js";
 import { withTyping } from "../utils/typing.js";
+import { audit, AuditEvent } from "../utils/auditLog.js";
 
 const execCommand: PrefixCommand = {
   name: "exec",
@@ -23,6 +24,10 @@ const execCommand: PrefixCommand = {
     }
 
     if (isCommandBlocked(command)) {
+      audit(AuditEvent.COMMAND_BLOCKED, ctx.message.author.id, {
+        command: `exec ${command}`,
+        success: false,
+      });
       await ctx.message.reply("This command is blocked for safety reasons.");
       return;
     }
