@@ -21,6 +21,7 @@ import {
   getMultiSessionManager,
 } from "./sessions/multiSession.js";
 import { sanitizeOutput } from "./utils/sanitizeOutput.js";
+import { cleanupUploads } from "./utils/fileUpload.js";
 
 // ── Static command imports (for .exe bundling) ──────────────────────
 import askCommand from "./commands/ask.js";
@@ -363,9 +364,18 @@ async function main(): Promise<void> {
     }
   });
 
-  // Graceful shutdown - cleanup all sessions
+  // Periodic upload cleanup (every 30 minutes, delete files older than 1 hour)
+  const uploadCleanupInterval = setInterval(() => {
+    const cleaned = cleanupUploads(client.workingDir);
+    if (cleaned > 0) {
+      console.log(`[cleanup] Periodic: deleted ${cleaned} old uploaded file(s).`);
+    }
+  }, 30 * 60 * 1000);
+
+  // Graceful shutdown - cleanup all sessions + uploads
   const shutdown = async () => {
     console.log("\n  Shutting down...");
+    clearInterval(uploadCleanupInterval);
     const multiSessionMgr = getMultiSessionManager();
     if (multiSessionMgr) {
       await multiSessionMgr.cleanup();

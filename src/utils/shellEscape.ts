@@ -6,12 +6,12 @@
  */
 
 /** Characters that have special meaning in cmd.exe */
-const CMD_META_CHARS = /[&|<>^%()";!]/;
+const CMD_META_CHARS = /[&|<>^%()";!`$]/;
 
 /**
  * Escape a single argument for safe use in a Windows cmd.exe shell command.
  * - Wraps the argument in double quotes
- * - Escapes internal double quotes by doubling them
+ * - Escapes internal double quotes with `\"`
  * - Escapes cmd.exe metacharacters with `^` inside the quoted string
  */
 export function escapeShellArgWindows(arg: string): string {
@@ -22,11 +22,11 @@ export function escapeShellArgWindows(arg: string): string {
     return arg;
   }
 
-  // Escape internal double quotes by doubling them
-  let escaped = arg.replace(/"/g, '""');
+  // Escape internal double quotes with backslash (more reliable than doubling)
+  let escaped = arg.replace(/"/g, '\\"');
 
   // Escape cmd.exe metacharacters with ^ (even inside quotes, some are interpreted)
-  escaped = escaped.replace(/([&|<>^%])/g, "^$1");
+  escaped = escaped.replace(/([&|<>^%`$])/g, "^$1");
 
   return `"${escaped}"`;
 }

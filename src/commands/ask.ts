@@ -69,8 +69,17 @@ const askCommand: PrefixCommand = {
       }
 
       if (uploaded.length > 0) {
-        const fileNames = uploaded.map((f) => f.fileName).join(", ");
+        const fileNames = uploaded.map((f) => f.originalName ?? f.fileName).join(", ");
         await ctx.message.reply(`📁 파일 업로드 완료: ${fileNames}`);
+
+        // Warn about suspicious file content
+        const contentWarnings = uploaded.filter((f) => f.contentWarning);
+        if (contentWarnings.length > 0) {
+          const warnings = contentWarnings
+            .map((f) => `⚠️ ${f.originalName}: ${f.contentWarning}`)
+            .join("\n");
+          await ctx.message.reply(`**[파일 내용 보안 경고]**\n${warnings}`);
+        }
       }
     }
 
@@ -82,8 +91,8 @@ const askCommand: PrefixCommand = {
       return;
     }
 
-    // 첨부파일 정보를 프롬프트에 포함
-    const finalMessage = buildFilePrompt(uploadedFiles, msg);
+    // 첨부파일 정보를 프롬프트에 포함 (상대 경로만 사용)
+    const finalMessage = buildFilePrompt(uploadedFiles, msg, ctx.client.workingDir);
 
     // Prompt injection warning (non-blocking)
     const injectionCheck = checkPromptInjection(finalMessage);

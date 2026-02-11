@@ -4,6 +4,7 @@ import type { NamedSession } from "../types.js";
 import { CLI_TOOLS } from "../config.js";
 import { createSession } from "../bot.js";
 import { wrapWithSecurityContext } from "../utils/promptGuard.js";
+import { cleanupUploads } from "../utils/fileUpload.js";
 
 /**
  * 멀티 세션 매니저
@@ -187,12 +188,18 @@ export class MultiSessionManager {
   }
 
   /**
-   * 모든 세션 정리
+   * 모든 세션 정리 + 오래된 업로드 파일 삭제
    */
   async cleanup(): Promise<void> {
     const cleanups = Array.from(this.sessions.values()).map((s) => s.manager.cleanup());
     await Promise.all(cleanups);
     this.sessions.clear();
+
+    // Clean up uploaded files (delete all — age 0)
+    const cleaned = cleanupUploads(this.workingDir, 0);
+    if (cleaned > 0) {
+      console.log(`[cleanup] Deleted ${cleaned} uploaded file(s).`);
+    }
   }
 }
 

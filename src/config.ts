@@ -117,12 +117,10 @@ export const FILE_UPLOAD = {
     ".cs", ".go", ".rs", ".rb", ".php", ".swift", ".kt", ".scala", ".lua",
     // Web files
     ".html", ".css", ".scss", ".sass", ".less", ".vue", ".svelte",
-    // Config/Data files
-    ".json", ".yaml", ".yml", ".toml", ".xml", ".ini", ".env", ".conf",
+    // Config/Data files (no .env — may contain secrets)
+    ".json", ".yaml", ".yml", ".toml", ".xml", ".ini", ".conf",
     // Documentation
     ".md", ".txt", ".rst", ".log",
-    // Shell scripts
-    ".sh", ".bash", ".zsh", ".bat", ".ps1", ".cmd",
     // Other
     ".sql", ".graphql", ".dockerfile", ".gitignore", ".editorconfig",
   ]),
