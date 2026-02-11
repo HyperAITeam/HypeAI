@@ -5,7 +5,9 @@
   "scripts": {
     "start": "tsx src/bot.ts",
     "build": "tsc",
-    "build:exe": "bun build src/bot.ts --compile --outfile dist/aidevelop-bot.exe --target bun-windows-x64",
+    "build:bundle": "node scripts/build.mjs",
+    "build:exe": "npm run build:bundle && pkg dist/bot.cjs --targets node18-win-x64 --output dist/aidevelop-bot.exe",
+    "build:exe:bun": "bun build src/bot.ts --compile --outfile dist/aidevelop-bot.exe --target bun-windows-x64",
     "dev": "tsx watch src/bot.ts",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -18,8 +20,16 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "esbuild": "^0.27.3",
+    "pkg": "^5.8.1",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vitest": "^3.2.4"
+  },
+  "pkg": {
+    "assets": [
+      "node_modules/@anthropic-ai/claude-agent-sdk/cli.js"
+    ],
+    "outputPath": "dist"
   }
 }
