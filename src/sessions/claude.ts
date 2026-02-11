@@ -6,6 +6,9 @@ import type { Message, TextChannel } from "discord.js";
 import type { ISessionManager, SessionInfo, SessionStats, HistoryEntry } from "./types.js";
 import type { CliTool } from "../types.js";
 import { handleAskUserQuestion } from "../utils/discordPrompt.js";
+import { withRetry } from "../utils/retry.js";
+import { RETRY_MAX_ATTEMPTS, RETRY_BASE_DELAY_MS } from "../config.js";
+import { audit, AuditEvent } from "../utils/auditLog.js";
 import { resolveNodeExecutable } from "../utils/nodeRuntime.js";
 
 /**
@@ -117,127 +120,26 @@ export class ClaudeSessionManager implements ISessionManager {
     this.abortController = new AbortController();
 
     try {
-      const cliPath = resolveClaudeCodePath();
-      const nodePath = await resolveNodeExecutable();
-      console.log(`  [Claude] cliPath: ${cliPath ?? "(SDK default)"}`);
-      console.log(`  [Claude] nodePath: ${nodePath}`);
-      console.log(`  [Claude] cwd: ${this.cwd}`);
-
-      const options: Record<string, unknown> = {
-        cwd: this.cwd,
-        permissionMode: "bypassPermissions",
-        allowDangerouslySkipPermissions: true,
-        abortController: this.abortController,
-        executable: nodePath,
-        ...(cliPath && { pathToClaudeCodeExecutable: cliPath }),
-        stderr: (data: string) => console.error("[Claude stderr]", data),
-        // pkg exe 환경에서 signal 옵션이 제대로 전달되지 않을 수 있으므로
-        // 직접 spawn해서 abort는 수동으로 처리한다.
-        spawnClaudeCodeProcess: (spawnOpts: {
-          command: string;
-          args: string[];
-          cwd?: string;
-          env: Record<string, string | undefined>;
-          signal: AbortSignal;
-        }) => {
-          console.log(`  [Claude] spawn: ${spawnOpts.command} ${spawnOpts.args[0] ?? ""}`);
-          const proc = spawn(spawnOpts.command, spawnOpts.args, {
-            cwd: spawnOpts.cwd,
-            env: spawnOpts.env as NodeJS.ProcessEnv,
-            stdio: ["pipe", "pipe", "pipe"],
-            windowsHide: true,
+      const resultText = await withRetry(
+        () => this._executeQuery(message, discordMessage, onProgress),
+        {
+          maxRetries: RETRY_MAX_ATTEMPTS,
+          baseDelayMs: RETRY_BASE_DELAY_MS,
+          maxDelayMs: 30000,
+          backoffMultiplier: 2,
+        },
+        async (attempt, error, delayMs) => {
+          audit(AuditEvent.RETRY_ATTEMPTED, discordMessage.author.id, {
+            details: { attempt, error: error.message, delayMs },
           });
-          proc.on("error", (err) => console.error("  [Claude] spawn error:", err.message));
-          proc.on("exit", (code, sig) => console.log(`  [Claude] exit: code=${code} signal=${sig}`));
-          proc.stderr?.on("data", (d: Buffer) => console.error("  [Claude] stderr:", d.toString()));
-
-          // signal → 수동 kill
-          const onAbort = () => { try { proc.kill(); } catch {} };
-          spawnOpts.signal.addEventListener("abort", onAbort, { once: true });
-          proc.on("exit", () => spawnOpts.signal.removeEventListener("abort", onAbort));
-
-          return proc;
+          const secs = Math.ceil(delayMs / 1000);
+          if ("send" in discordMessage.channel) {
+            await discordMessage.channel.send(
+              `Retry ${attempt}/${RETRY_MAX_ATTEMPTS} in ${secs}s... (${error.message})`,
+            ).catch(() => {});
+          }
         },
-        canUseTool: async (
-          toolName: string,
-          input: Record<string, unknown>,
-        ) => {
-          if (toolName === "AskUserQuestion") {
-            const result = await handleAskUserQuestion(
-              input as any,
-              discordMessage.channel as TextChannel,
-              discordMessage.author.id,
-            );
-            return { behavior: "allow" as const, updatedInput: result };
-          }
-          return { behavior: "allow" as const, updatedInput: input };
-        },
-      };
-
-      if (this.sessionId) {
-        options.resume = this.sessionId;
-      }
-
-      let resultText = "";
-      let newSessionId: string | null = null;
-
-      console.log("  [Claude] Starting query...");
-      const conversation = query({ prompt: message, options: options as any });
-      try {
-        for await (const msg of conversation) {
-          console.log(`  [Claude] msg: ${msg.type}${(msg as any).subtype ? "/" + (msg as any).subtype : ""}`);
-          if (msg.type === "system" && (msg as any).subtype === "init") {
-            newSessionId = (msg as any).session_id ?? null;
-          }
-
-          // 실시간 진행 상태 콜백
-          if (onProgress) {
-            if (msg.type === "assistant") {
-              const content = (msg as any).message?.content;
-              if (Array.isArray(content)) {
-                for (const block of content) {
-                  if (block.type === "tool_use") {
-                    const status = formatToolStatus(block.name, block.input);
-                    onProgress(status);
-                  }
-                }
-              }
-            } else if (msg.type === "tool_progress") {
-              const tp = msg as any;
-              const elapsed = Math.round(tp.elapsed_time_seconds ?? 0);
-              const status = `${toolEmoji(tp.tool_name)} ${tp.tool_name} (${elapsed}s)`;
-              onProgress(status);
-            } else if (msg.type === "stream_event") {
-              const event = (msg as any).event;
-              if (event?.type === "content_block_start" && event.content_block?.type === "tool_use") {
-                const toolName = event.content_block.name;
-                onProgress(`${toolEmoji(toolName)} ${toolName}...`);
-              }
-            }
-          }
-
-          if (msg.type === "result") {
-            const result = msg as any;
-            resultText = result.result ?? "";
-            if (result.session_id) {
-              newSessionId = result.session_id;
-            }
-          }
-        }
-      } catch (queryErr: any) {
-        console.error("  [Claude] Query error:", queryErr.message ?? queryErr);
-        // 이미 부분 결과가 있으면 반환, 없으면 에러 전파
-        if (resultText.trim()) {
-          console.log("  [Claude] Returning partial result despite error.");
-        } else {
-          throw queryErr;
-        }
-      }
-      console.log("  [Claude] Query complete.");
-
-      if (newSessionId) {
-        this.sessionId = newSessionId;
-      }
+      );
 
       this.messageCount++;
       if (this.startedAt === 0) this.startedAt = Date.now();
@@ -258,6 +160,125 @@ export class ClaudeSessionManager implements ISessionManager {
       this.busy = false;
       this.abortController = null;
     }
+  }
+
+  private async _executeQuery(message: string, discordMessage: Message, onProgress?: (status: string) => void): Promise<string> {
+    const cliPath = resolveClaudeCodePath();
+    const nodePath = await resolveNodeExecutable();
+    console.log(`  [Claude] cliPath: ${cliPath ?? "(SDK default)"}`);
+    console.log(`  [Claude] nodePath: ${nodePath}`);
+    console.log(`  [Claude] cwd: ${this.cwd}`);
+
+    const options: Record<string, unknown> = {
+      cwd: this.cwd,
+      permissionMode: "bypassPermissions",
+      allowDangerouslySkipPermissions: true,
+      abortController: this.abortController,
+      executable: nodePath,
+      ...(cliPath && { pathToClaudeCodeExecutable: cliPath }),
+      stderr: (data: string) => console.error("[Claude stderr]", data),
+      // pkg exe 환경에서 signal 옵션이 제대로 전달되지 않을 수 있으므로
+      // 직접 spawn해서 abort는 수동으로 처리한다.
+      spawnClaudeCodeProcess: (spawnOpts: {
+        command: string;
+        args: string[];
+        cwd?: string;
+        env: Record<string, string | undefined>;
+        signal: AbortSignal;
+      }) => {
+        console.log(`  [Claude] spawn: ${spawnOpts.command} ${spawnOpts.args[0] ?? ""}`);
+        const proc = spawn(spawnOpts.command, spawnOpts.args, {
+          cwd: spawnOpts.cwd,
+          env: spawnOpts.env as NodeJS.ProcessEnv,
+          stdio: ["pipe", "pipe", "pipe"],
+          windowsHide: true,
+        });
+        proc.on("error", (err) => console.error("  [Claude] spawn error:", err.message));
+        proc.on("exit", (code, sig) => console.log(`  [Claude] exit: code=${code} signal=${sig}`));
+        proc.stderr?.on("data", (d: Buffer) => console.error("  [Claude] stderr:", d.toString()));
+
+        const onAbort = () => { try { proc.kill(); } catch {} };
+        spawnOpts.signal.addEventListener("abort", onAbort, { once: true });
+        proc.on("exit", () => spawnOpts.signal.removeEventListener("abort", onAbort));
+
+        return proc;
+      },
+      canUseTool: async (
+        toolName: string,
+        input: Record<string, unknown>,
+      ) => {
+        if (toolName === "AskUserQuestion") {
+          const result = await handleAskUserQuestion(
+            input as any,
+            discordMessage.channel as TextChannel,
+            discordMessage.author.id,
+          );
+          return { behavior: "allow" as const, updatedInput: result };
+        }
+        return { behavior: "allow" as const, updatedInput: input };
+      },
+    };
+
+    if (this.sessionId) {
+      options.resume = this.sessionId;
+    }
+
+    // Check abort before query
+    if (this.abortController?.signal.aborted) {
+      throw new Error("Query aborted");
+    }
+
+    let resultText = "";
+    let newSessionId: string | null = null;
+
+    console.log("  [Claude] Starting query...");
+    for await (const msg of query({ prompt: message, options: options as any })) {
+      console.log(`  [Claude] msg: ${msg.type}${(msg as any).subtype ? "/" + (msg as any).subtype : ""}`);
+      if (msg.type === "system" && (msg as any).subtype === "init") {
+        newSessionId = (msg as any).session_id ?? null;
+      }
+
+      // 실시간 진행 상태 콜백
+      if (onProgress) {
+        if (msg.type === "assistant") {
+          const content = (msg as any).message?.content;
+          if (Array.isArray(content)) {
+            for (const block of content) {
+              if (block.type === "tool_use") {
+                const status = formatToolStatus(block.name, block.input);
+                onProgress(status);
+              }
+            }
+          }
+        } else if (msg.type === "tool_progress") {
+          const tp = msg as any;
+          const elapsed = Math.round(tp.elapsed_time_seconds ?? 0);
+          const status = `${toolEmoji(tp.tool_name)} ${tp.tool_name} (${elapsed}s)`;
+          onProgress(status);
+        } else if (msg.type === "stream_event") {
+          const event = (msg as any).event;
+          if (event?.type === "content_block_start" && event.content_block?.type === "tool_use") {
+            const toolName = event.content_block.name;
+            onProgress(`${toolEmoji(toolName)} ${toolName}...`);
+          }
+        }
+      }
+
+      if (msg.type === "result") {
+        const result = msg as any;
+        resultText = result.result ?? "";
+        if (result.session_id) {
+          newSessionId = result.session_id;
+        }
+      }
+    }
+    console.log("  [Claude] Query complete.");
+
+    if (newSessionId) {
+      this.sessionId = newSessionId;
+    }
+
+    return resultText;
   }
 
   async kill(): Promise<boolean> {
@@ -324,7 +345,31 @@ export class ClaudeSessionManager implements ISessionManager {
     }
   }
 
+  getPersistedState(): import("../types.js").PersistedSessionState {
+    return {
+      sessionId: this.sessionId,
+      messageCount: this.messageCount,
+      startedAt: this.startedAt,
+      totalInputTokens: this.totalInputTokens,
+      totalOutputTokens: this.totalOutputTokens,
+      history: [...this.history],
+    };
+  }
+
+  restoreFromState(state: import("../types.js").PersistedSessionState): void {
+    this.sessionId = state.sessionId;
+    this.messageCount = state.messageCount;
+    this.startedAt = state.startedAt;
+    this.totalInputTokens = state.totalInputTokens;
+    this.totalOutputTokens = state.totalOutputTokens;
+    this.history = [...state.history];
+  }
+
   async cleanup(): Promise<void> {
     await this.kill();
+  }
+
+  getCwd(): string {
+    return this.cwd;
   }
 }

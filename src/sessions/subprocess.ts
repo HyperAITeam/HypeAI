@@ -4,6 +4,9 @@ import type { ISessionManager, SessionInfo, SessionStats, HistoryEntry } from ".
 import type { CliTool } from "../types.js";
 import { buildSafeShellCmd } from "../utils/shellEscape.js";
 import { sanitizeOutput } from "../utils/sanitizeOutput.js";
+import { withRetry } from "../utils/retry.js";
+import { RETRY_MAX_ATTEMPTS, RETRY_BASE_DELAY_MS } from "../config.js";
+import { audit, AuditEvent } from "../utils/auditLog.js";
 
 /** ANSI escape code 제거 (터미널 색상/커서 코드 → Discord에선 깨짐) */
 function stripAnsi(s: string): string {
@@ -51,11 +54,52 @@ export class SubprocessSessionManager implements ISessionManager {
   }
 
   async sendMessage(message: string, _discordMessage: Message): Promise<string> {
-    const cmd = this.buildCommand(message);
-    const shellCmd = buildSafeShellCmd(cmd);
     this.lastMessage = message;
 
-    return new Promise<string>((resolve) => {
+    try {
+      const resultText = await withRetry(
+        () => this._executeQuery(message),
+        {
+          maxRetries: RETRY_MAX_ATTEMPTS,
+          baseDelayMs: RETRY_BASE_DELAY_MS,
+          maxDelayMs: 30000,
+          backoffMultiplier: 2,
+        },
+        async (attempt, error, delayMs) => {
+          audit(AuditEvent.RETRY_ATTEMPTED, _discordMessage.author.id, {
+            details: { attempt, error: error.message, delayMs },
+          });
+          const secs = Math.ceil(delayMs / 1000);
+          if ("send" in _discordMessage.channel) {
+            await _discordMessage.channel.send(
+              `Retry ${attempt}/${RETRY_MAX_ATTEMPTS} in ${secs}s... (${error.message})`,
+            ).catch(() => {});
+          }
+        },
+      );
+
+      this.messageCount++;
+      if (this.startedAt === 0) this.startedAt = Date.now();
+
+      const inputTokens = estimateTokens(this.lastMessage);
+      const outputTokens = estimateTokens(resultText);
+      this.totalInputTokens += inputTokens;
+      this.totalOutputTokens += outputTokens;
+
+      this.addHistory("user", this.lastMessage, inputTokens);
+      this.addHistory("assistant", resultText, outputTokens);
+
+      return resultText.trim() || "(no output)";
+    } catch (err: any) {
+      return `[Error] ${err.message ?? err}`;
+    }
+  }
+
+  private _executeQuery(message: string): Promise<string> {
+    const cmd = this.buildCommand(message);
+    const shellCmd = buildSafeShellCmd(cmd);
+
+    return new Promise<string>((resolve, reject) => {
       console.log(`  [${this.cliName}] exec: ${shellCmd}`);
       console.log(`  [${this.cliName}] cwd: ${this.cwd}`);
       const proc = spawn(shellCmd, {
@@ -89,36 +133,20 @@ export class SubprocessSessionManager implements ISessionManager {
 
         if (code !== 0) {
           const err = stderr.trim() || stdout.trim() || "CLI exited with error";
-          resolve(`[Error] ${sanitizeOutput(err)}`);
+          reject(new Error(sanitizeOutput(err)));
           return;
         }
 
         const [result, newSid] = this.parseOutput(stdout);
         if (newSid) this.sessionId = newSid;
 
-        this.messageCount++;
-        if (this.startedAt === 0) this.startedAt = Date.now();
-
-        // 토큰 추정 및 히스토리 기록
-        const inputTokens = estimateTokens(this.lastMessage);
-        const outputTokens = estimateTokens(result);
-        this.totalInputTokens += inputTokens;
-        this.totalOutputTokens += outputTokens;
-
-        this.addHistory("user", this.lastMessage, inputTokens);
-        this.addHistory("assistant", result, outputTokens);
-
-        resolve(result.trim() || "(no output)");
+        resolve(result);
       });
 
       proc.on("error", (err) => {
         console.error(`  [${this.cliName}] spawn error: ${err.message}`);
         this.proc = null;
-        if (err.message.includes("ENOENT")) {
-          resolve(`[Error] \`${this.cliName}\` is not installed or not in PATH.`);
-        } else {
-          resolve(`[Error] Failed to run \`${this.cliName}\`: ${err.message}`);
-        }
+        reject(err);
       });
     });
   }
@@ -186,9 +214,33 @@ export class SubprocessSessionManager implements ISessionManager {
     }
   }
 
+  getPersistedState(): import("../types.js").PersistedSessionState {
+    return {
+      sessionId: this.sessionId,
+      messageCount: this.messageCount,
+      startedAt: this.startedAt,
+      totalInputTokens: this.totalInputTokens,
+      totalOutputTokens: this.totalOutputTokens,
+      history: [...this.history],
+    };
+  }
+
+  restoreFromState(state: import("../types.js").PersistedSessionState): void {
+    this.sessionId = state.sessionId;
+    this.messageCount = state.messageCount;
+    this.startedAt = state.startedAt;
+    this.totalInputTokens = state.totalInputTokens;
+    this.totalOutputTokens = state.totalOutputTokens;
+    this.history = [...state.history];
+  }
+
   async cleanup(): Promise<void> {
     if (this.isBusy) this.proc?.kill();
     this.proc = null;
+  }
+
+  getCwd(): string {
+    return this.cwd;
   }
 
   // --- internals ---

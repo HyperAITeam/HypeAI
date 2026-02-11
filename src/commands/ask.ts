@@ -6,6 +6,7 @@ import { sendResult } from "../utils/formatter.js";
 import { withTyping } from "../utils/typing.js";
 import { getMultiSessionManager } from "../sessions/multiSession.js";
 import { checkPromptInjection } from "../utils/promptGuard.js";
+import { audit, AuditEvent } from "../utils/auditLog.js";
 
 /**
  * 명령어 인자에서 세션 이름과 메시지 분리
@@ -66,6 +67,10 @@ const askCommand: PrefixCommand = {
     // Prompt injection warning (non-blocking)
     const injectionCheck = checkPromptInjection(msg);
     if (injectionCheck.detected) {
+      audit(AuditEvent.INJECTION_WARNING, ctx.message.author.id, {
+        command: "ask",
+        details: { warnings: injectionCheck.warnings },
+      });
       await ctx.message.reply(
         `**[Security Warning]** Suspicious prompt pattern detected: ${injectionCheck.warnings.join(", ")}. Proceeding with caution.`,
       );
