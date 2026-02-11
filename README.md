@@ -156,10 +156,10 @@ Discord에서 `!ask 코드 리뷰해줘` 입력!
 | 도구 | 연동 방식 | 인터랙티브 | 세션 유지 |
 |:-----|:---------|:----------:|:---------:|
 | **Claude Code** | Agent SDK | ✅ | ✅ |
-| **Gemini CLI** | Stream JSON | ❌ | ❌ |
+| **Gemini CLI** | Stream JSON | ✅ | ✅ |
 | **OpenCode** | subprocess | ❌ | ❌ |
 
-> **Claude Code**는 Agent SDK를 통해 직접 통신합니다. AI가 선택지를 물어보면 Discord 버튼/드롭다운으로 응답할 수 있어요! (4개 이하 → 버튼, 5개 이상 → 드롭다운 메뉴)
+> **Claude Code & Gemini CLI**는 AI가 선택지를 물어보면 Discord 버튼/드롭다운으로 응답할 수 있어요! (4개 이하 → 버튼, 5개 이상 → 드롭다운 메뉴)
 
 ---
 
