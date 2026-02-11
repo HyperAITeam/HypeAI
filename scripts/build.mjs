@@ -27,6 +27,8 @@ await build({
     "utf-8-validate",
     "zlib-sync",
     "erlpack",
+    // Puppeteer requires Chromium binary — cannot be bundled into exe
+    "puppeteer",
   ],
   // Define for proper environment
   define: {
