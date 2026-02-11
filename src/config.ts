@@ -38,18 +38,38 @@ function parseAllowedUserIds(raw: string): Set<string> {
 
 export let ALLOWED_USER_IDS = parseAllowedUserIds(process.env.ALLOWED_USER_IDS ?? "");
 
-// Timeouts
-export let COMMAND_TIMEOUT = parseInt(process.env.COMMAND_TIMEOUT ?? "30", 10);
-export let AI_CLI_TIMEOUT = parseInt(process.env.AI_CLI_TIMEOUT ?? "300", 10);
+// Timeouts (with range clamping)
+function clampTimeout(value: number, defaultVal: number, min: number, max: number): number {
+  if (isNaN(value)) return defaultVal;
+  return Math.max(min, Math.min(max, value));
+}
+
+export let COMMAND_TIMEOUT = clampTimeout(
+  parseInt(process.env.COMMAND_TIMEOUT ?? "30", 10), 30, 5, 120,
+);
+export let AI_CLI_TIMEOUT = clampTimeout(
+  parseInt(process.env.AI_CLI_TIMEOUT ?? "300", 10), 300, 30, 1800,
+);
 
 /** Reload config from .env (used after interactive setup creates .env) */
 export function reloadConfig(): void {
   dotenv.config({ path: path.join(process.cwd(), ".env"), override: true });
   DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN ?? "";
   COMMAND_PREFIX = process.env.COMMAND_PREFIX ?? "!";
-  ALLOWED_USER_IDS = parseAllowedUserIds(process.env.ALLOWED_USER_IDS ?? "");
-  COMMAND_TIMEOUT = parseInt(process.env.COMMAND_TIMEOUT ?? "30", 10);
-  AI_CLI_TIMEOUT = parseInt(process.env.AI_CLI_TIMEOUT ?? "300", 10);
+
+  ALLOWED_USER_IDS = new Set(
+    (process.env.ALLOWED_USER_IDS ?? "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean),
+  );
+  COMMAND_TIMEOUT = clampTimeout(
+    parseInt(process.env.COMMAND_TIMEOUT ?? "30", 10), 30, 5, 120,
+  );
+  AI_CLI_TIMEOUT = clampTimeout(
+    parseInt(process.env.AI_CLI_TIMEOUT ?? "300", 10), 300, 30, 1800,
+  );
+
 }
 
 // CLI tool definitions
@@ -93,12 +113,17 @@ export const CLI_TOOLS: Record<string, CliTool> = {
   },
 };
 
-// Blocked commands for !exec
+// Blocked commands for !exec (prefix-matched against user input)
 export const BLOCKED_COMMANDS = new Set([
   "format", "diskpart", "shutdown", "restart",
   "del /s", "rd /s", "rmdir /s",
   "reg delete", "bcdedit", "cipher /w",
   "net user", "net localgroup",
+  "powershell", "pwsh", "cmd /c", "cmd.exe",
+  "wsl", "bash", "wmic",
+  "sc delete", "sc stop", "sc config",
+  "taskkill", "schtasks", "netsh",
+  "bootrec", "bcdboot", "setx", "erase /s",
 ]);
 
 // Discord message limit
