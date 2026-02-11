@@ -15,3 +15,14 @@ GEMINI.md
 experiments/
 logs/
 nul
+
+# Session & Runtime Data
+hypeai-sessions.json
+audit-logs/
+
+# Node.js auto-download (for pkg builds)
+node.exe
+node.exe.tmp
+
+# Build artifacts
+*.cjs
