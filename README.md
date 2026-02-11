@@ -351,6 +351,16 @@ dist/
 
 <div align="center">
 
+### 🎰 랜덤 후원 룰렛
+
+누구에게 후원할지 고민된다면? 룰렛을 돌려보세요!
+
+[![Random Supporter Roulette](https://img.shields.io/badge/🎰_SPIN_THE_WHEEL!-FF6B6B?style=for-the-badge&logoColor=white)](https://hyperaiteam.github.io/HypeAI/roulette.html)
+
+---
+
+### 직접 후원하기
+
 | Maintainer | Support |
 |:----------:|:-------:|
 | **hamsik2rang** | [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/hamsik2rang) |
