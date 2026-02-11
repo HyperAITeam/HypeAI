@@ -108,9 +108,28 @@ const askCommand: PrefixCommand = {
     const folder = path.basename(ctx.client.workingDir);
 
     try {
-      const result = await withTyping(ctx.message, () =>
-        multiSession.sendMessage(sessionName, msg, ctx.message),
+      // 진행 메시지 전송
+      const progressMsg = await ctx.message.reply(
+        `\u{23F3} **${tool.name}** \uC791\uC5C5 \uC2DC\uC791...`,
       );
+      let lastEditTime = 0;
+      const THROTTLE_MS = 2000;
+
+      const onProgress = (status: string) => {
+        const now = Date.now();
+        if (now - lastEditTime < THROTTLE_MS) return;
+        lastEditTime = now;
+        progressMsg
+          .edit(`\u{23F3} **${tool.name}** \uC791\uC5C5 \uC911...\n${status}`)
+          .catch(() => {});
+      };
+
+      const result = await withTyping(ctx.message, () =>
+        multiSession.sendMessage(sessionName, msg, ctx.message, onProgress),
+      );
+
+      // 진행 메시지 삭제
+      await progressMsg.delete().catch(() => {});
 
       const prefix =
         sessionName || multiSession.listSessions().length > 1

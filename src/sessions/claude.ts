@@ -53,6 +53,45 @@ function estimateTokens(text: string): number {
 const MAX_HISTORY_ENTRIES = 50;
 const MAX_HISTORY_CONTENT_LENGTH = 500;
 
+const TOOL_EMOJI: Record<string, string> = {
+  Read: "\u{1F4D6}",
+  Edit: "\u{270F}\u{FE0F}",
+  Write: "\u{270F}\u{FE0F}",
+  Bash: "\u{1F527}",
+  Grep: "\u{1F50D}",
+  Glob: "\u{1F50D}",
+  WebSearch: "\u{1F310}",
+  WebFetch: "\u{1F310}",
+  Task: "\u{1F4CB}",
+};
+
+function toolEmoji(toolName: string): string {
+  return TOOL_EMOJI[toolName] ?? "\u{2699}\u{FE0F}";
+}
+
+function formatToolStatus(toolName: string, input: Record<string, unknown>): string {
+  const emoji = toolEmoji(toolName);
+  if (toolName === "Read" && input.file_path) {
+    return `${emoji} Reading \`${basename(String(input.file_path))}\``;
+  }
+  if ((toolName === "Edit" || toolName === "Write") && input.file_path) {
+    return `${emoji} Editing \`${basename(String(input.file_path))}\``;
+  }
+  if (toolName === "Bash" && input.command) {
+    const cmd = String(input.command).slice(0, 40);
+    return `${emoji} Running \`${cmd}\``;
+  }
+  if ((toolName === "Grep" || toolName === "Glob") && input.pattern) {
+    return `${emoji} Searching \`${String(input.pattern).slice(0, 30)}\``;
+  }
+  return `${emoji} ${toolName}`;
+}
+
+function basename(filePath: string): string {
+  const parts = filePath.replace(/\\/g, "/").split("/");
+  return parts[parts.length - 1] ?? filePath;
+}
+
 export class ClaudeSessionManager implements ISessionManager {
   private tool: CliTool;
   private cwd: string;
@@ -76,13 +115,13 @@ export class ClaudeSessionManager implements ISessionManager {
     return this.busy;
   }
 
-  async sendMessage(message: string, discordMessage: Message): Promise<string> {
+  async sendMessage(message: string, discordMessage: Message, onProgress?: (status: string) => void): Promise<string> {
     this.busy = true;
     this.abortController = new AbortController();
 
     try {
       const resultText = await withRetry(
-        () => this._executeQuery(message, discordMessage),
+        () => this._executeQuery(message, discordMessage, onProgress),
         {
           maxRetries: RETRY_MAX_ATTEMPTS,
           baseDelayMs: RETRY_BASE_DELAY_MS,
@@ -123,7 +162,7 @@ export class ClaudeSessionManager implements ISessionManager {
     }
   }
 
-  private async _executeQuery(message: string, discordMessage: Message): Promise<string> {
+  private async _executeQuery(message: string, discordMessage: Message, onProgress?: (status: string) => void): Promise<string> {
     const cliPath = resolveClaudeCodePath();
     const nodePath = await resolveNodeExecutable();
     console.log(`  [Claude] cliPath: ${cliPath ?? "(SDK default)"}`);
@@ -198,6 +237,33 @@ export class ClaudeSessionManager implements ISessionManager {
       if (msg.type === "system" && (msg as any).subtype === "init") {
         newSessionId = (msg as any).session_id ?? null;
       }
+
+      // 실시간 진행 상태 콜백
+      if (onProgress) {
+        if (msg.type === "assistant") {
+          const content = (msg as any).message?.content;
+          if (Array.isArray(content)) {
+            for (const block of content) {
+              if (block.type === "tool_use") {
+                const status = formatToolStatus(block.name, block.input);
+                onProgress(status);
+              }
+            }
+          }
+        } else if (msg.type === "tool_progress") {
+          const tp = msg as any;
+          const elapsed = Math.round(tp.elapsed_time_seconds ?? 0);
+          const status = `${toolEmoji(tp.tool_name)} ${tp.tool_name} (${elapsed}s)`;
+          onProgress(status);
+        } else if (msg.type === "stream_event") {
+          const event = (msg as any).event;
+          if (event?.type === "content_block_start" && event.content_block?.type === "tool_use") {
+            const toolName = event.content_block.name;
+            onProgress(`${toolEmoji(toolName)} ${toolName}...`);
+          }
+        }
+      }
+
       if (msg.type === "result") {
         const result = msg as any;
         resultText = result.result ?? "";

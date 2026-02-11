@@ -97,7 +97,7 @@ export interface PersistedSessionState {
 
 export interface ISessionManager {
   readonly isBusy: boolean;
-  sendMessage(message: string, discordMessage: Message): Promise<string>;
+  sendMessage(message: string, discordMessage: Message, onProgress?: (status: string) => void): Promise<string>;
   kill(): Promise<boolean>;
   newSession(): Promise<void>;
   getInfo(): SessionInfo;
