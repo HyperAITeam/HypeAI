@@ -15,3 +15,5 @@ GEMINI.md
 experiments/
 nul
 .chromium/
+.hypeai-sessions.json
+logs/

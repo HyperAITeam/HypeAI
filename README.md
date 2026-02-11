@@ -35,21 +35,35 @@ Discord 메시지로 Claude Code, Gemini CLI, OpenCode를 원격으로 조작
 <td width="50%">
 
 ### 💬 인터랙티브 응답
-Claude가 물어보면 Discord 버튼으로 바로 응답
+Claude가 물어보면 Discord 버튼/드롭다운으로 바로 응답
 
 </td>
 </tr>
 <tr>
 <td width="50%">
 
-### 🔒 보안 설계
-화이트리스트 기반 접근 제어 + 위험 명령어 차단
+### 🔒 다층 보안 설계
+화이트리스트 + 위험 명령어 차단 + 프롬프트 인젝션 탐지 + 출력 자동 검열
 
 </td>
 <td width="50%">
 
 ### 📦 원클릭 실행
-exe 파일 더블클릭으로 바로 시작
+exe 파일 더블클릭으로 바로 시작 (Node.js 자동 다운로드)
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 🔀 멀티세션 관리
+여러 AI 세션을 동시에 이름별로 생성/전환하며 운영
+
+</td>
+<td width="50%">
+
+### 📊 Git Diff 시각화
+git diff를 PNG 이미지로 렌더링하여 Discord에서 바로 확인
 
 </td>
 </tr>
@@ -74,20 +88,54 @@ Discord에서 `!ask 코드 리뷰해줘` 입력!
 
 ## 📋 명령어
 
+### AI CLI
+
 | 명령어 | 별칭 | 설명 |
 |:-------|:-----|:-----|
-| `!ask <메시지>` | `!a` | AI에게 메시지 전송 |
-| `!session info` | `!s` | 현재 세션 상태 확인 |
-| `!session new` | `!s new` | 새 대화 시작 |
-| `!session kill` | `!s stop` | 진행 중인 AI 중단 |
+| `!ask [session] <메시지>` | `!a` | AI에게 메시지 전송 |
+
+> 💡 **멀티세션**: `!a work "코드 분석해줘"` 처럼 세션 이름을 지정하면 해당 세션으로 메시지가 전달됩니다.
+
+### 세션 관리
+
+| 명령어 | 별칭 | 설명 |
+|:-------|:-----|:-----|
+| `!session create <name> [cli]` | `!s c` | 새 세션 생성 (CLI 도구 지정 가능) |
+| `!session list` | `!s ls` | 모든 세션 목록 + 상태 |
+| `!session switch <name>` | `!s sw` | 활성 세션 전환 |
+| `!session info [name]` | `!s` | 세션 상세 정보 |
+| `!session new [name]` | `!s new` | 세션 대화 초기화 |
+| `!session kill [name]` | `!s stop` | 진행 중인 AI 프로세스 중단 |
+| `!session delete <name>` | `!s rm` | 세션 삭제 |
+| `!session stats [name]` | `!s stat` | 토큰 사용량 통계 |
+| `!session history [name] [count]` | `!s h` | 대화 기록 조회 |
+
+### 작업 큐
+
+| 명령어 | 별칭 | 설명 |
+|:-------|:-----|:-----|
 | `!task add <작업>` | `!t a` | 작업 예약 추가 |
 | `!task list` | `!t ls` | 예약된 작업 목록 |
 | `!task run` | `!t r` | 예약된 작업 순차 실행 |
 | `!task remove <번호>` | `!t rm` | 작업 삭제 |
 | `!task clear` | `!t c` | 대기 중인 작업 전체 삭제 |
 | `!task stop` | `!t s` | 실행 중인 작업 중단 |
+
+### Git 도구
+
+| 명령어 | 별칭 | 설명 |
+|:-------|:-----|:-----|
+| `!diff` | `!d`, `!changes` | git diff를 PNG 이미지로 시각화 |
+| `!diff --staged` | `!d -s` | 스테이지된 변경사항만 표시 |
+| `!diff <file>` | | 특정 파일의 diff 표시 |
+| `!diff HEAD~1` | | 특정 커밋과 비교 |
+
+### 시스템
+
+| 명령어 | 별칭 | 설명 |
+|:-------|:-----|:-----|
 | `!exec <명령어>` | `!run`, `!cmd` | CMD 명령어 실행 |
-| `!status` | `!sysinfo` | 시스템 정보 |
+| `!status` | `!sysinfo` | 시스템 정보 (CPU, 메모리, 업타임) |
 | `!myid` | `!id` | Discord ID 확인 |
 | `!help` | | 도움말 |
 
@@ -98,10 +146,10 @@ Discord에서 `!ask 코드 리뷰해줘` 입력!
 | 도구 | 연동 방식 | 인터랙티브 | 세션 유지 |
 |:-----|:---------|:----------:|:---------:|
 | **Claude Code** | Agent SDK | ✅ | ✅ |
-| **Gemini CLI** | subprocess | ❌ | ❌ |
+| **Gemini CLI** | Stream JSON | ❌ | ❌ |
 | **OpenCode** | subprocess | ❌ | ❌ |
 
-> **Claude Code**는 Agent SDK를 통해 직접 통신합니다. AI가 선택지를 물어보면 Discord 버튼으로 응답할 수 있어요!
+> **Claude Code**는 Agent SDK를 통해 직접 통신합니다. AI가 선택지를 물어보면 Discord 버튼/드롭다운으로 응답할 수 있어요! (4개 이하 → 버튼, 5개 이상 → 드롭다운 메뉴)
 
 ---
 
@@ -111,7 +159,7 @@ Discord에서 `!ask 코드 리뷰해줘` 입력!
 <summary><b>방법 1: exe 파일 (권장)</b></summary>
 
 ### 사전 요구
-- **Node.js v18+** (Claude Code 사용 시 필수)
+- **Node.js v18+** (없으면 자동 다운로드 시도)
 - Claude Code 인증 (`claude login` 또는 `ANTHROPIC_API_KEY`)
 
 ### 설치
@@ -168,8 +216,8 @@ npx tsx src/bot.ts
 | `ALLOWED_USER_IDS` | ✅ | — | 허용할 유저 ID (17-19자리 숫자, 쉼표 구분) |
 | `ANTHROPIC_API_KEY` | ❌ | — | API 키 (`claude login` 시 불필요) |
 | `COMMAND_PREFIX` | ❌ | `!` | 명령어 접두사 |
-| `COMMAND_TIMEOUT` | ❌ | `30` | CMD 타임아웃 (초) |
-| `AI_CLI_TIMEOUT` | ❌ | `300` | AI 타임아웃 (초) |
+| `COMMAND_TIMEOUT` | ❌ | `30` | CMD 타임아웃 (초, 범위: 5~120) |
+| `AI_CLI_TIMEOUT` | ❌ | `300` | AI 타임아웃 (초, 범위: 30~1800) |
 
 > ⚠️ **보안 주의**: Discord ID는 17-19자리 **숫자**입니다 (유저네임 ❌). ID는 외부에 노출하지 마세요!
 
@@ -178,6 +226,26 @@ npx tsx src/bot.ts
 ```env
 ALLOWED_USER_IDS=111111111111111111,222222222222222222
 ```
+
+---
+
+## 🔒 보안
+
+<details>
+<summary><b>보안 기능 상세</b></summary>
+
+| 기능 | 설명 |
+|:-----|:-----|
+| **화이트리스트 접근 제어** | `ALLOWED_USER_IDS`에 등록된 유저만 봇 사용 가능 |
+| **위험 명령어 차단** | `format`, `shutdown`, `del /s`, `powershell` 등 위험 명령어/실행파일 차단 |
+| **프롬프트 인젝션 탐지** | 역할 변경, 시스템 프롬프트 주입, 탈옥 시도 등 의심 패턴 경고 |
+| **출력 자동 검열** | API 키, 토큰, 사용자 경로 등 민감 정보 자동 마스킹 |
+| **민감 파일 필터링** | diff에서 `.env`, `credentials`, `secrets` 등 민감 파일 자동 제외 |
+| **보안 컨텍스트 래핑** | AI에게 작업 디렉토리 제한 규칙 자동 주입 |
+
+자세한 보안 정책은 [SECURITY.md](SECURITY.md)를 참고하세요.
+
+</details>
 
 ---
 
@@ -247,6 +315,17 @@ dist/
 ```
 
 </details>
+
+---
+
+## 📚 문서
+
+| 문서 | 설명 |
+|:-----|:-----|
+| [GUIDE.md](GUIDE.md) | 상세 사용자/개발자 가이드 |
+| [SECURITY.md](SECURITY.md) | 보안 정책 |
+| [CHANGELOG.md](CHANGELOG.md) | 버전별 변경 이력 |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 기여 가이드 |
 
 ---
 

@@ -35,21 +35,35 @@ Control Claude Code, Gemini CLI, OpenCode remotely via Discord messages
 <td width="50%">
 
 ### 💬 Interactive Responses
-When Claude asks questions, respond instantly with Discord buttons
+When Claude asks questions, respond instantly with Discord buttons/dropdowns
 
 </td>
 </tr>
 <tr>
 <td width="50%">
 
-### 🔒 Security First
-Whitelist-based access control + dangerous command blocking
+### 🔒 Multi-Layer Security
+Whitelist + command blocking + prompt injection detection + output sanitization
 
 </td>
 <td width="50%">
 
 ### 📦 One-Click Launch
-Just double-click the exe file to start
+Just double-click the exe file to start (auto-downloads Node.js if needed)
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 🔀 Multi-Session Management
+Create, switch, and manage multiple named AI sessions simultaneously
+
+</td>
+<td width="50%">
+
+### 📊 Git Diff Visualization
+Render git diffs as PNG images viewable directly in Discord
 
 </td>
 </tr>
@@ -74,20 +88,54 @@ Type `!ask review my code` in Discord!
 
 ## 📋 Commands
 
+### AI CLI
+
 | Command | Alias | Description |
 |:--------|:------|:------------|
-| `!ask <message>` | `!a` | Send message to AI |
-| `!session info` | `!s` | Check session status |
-| `!session new` | `!s new` | Start new conversation |
-| `!session kill` | `!s stop` | Stop running AI |
+| `!ask [session] <message>` | `!a` | Send message to AI |
+
+> 💡 **Multi-session**: Use `!a work "analyze this code"` to send a message to a specific named session.
+
+### Session Management
+
+| Command | Alias | Description |
+|:--------|:------|:------------|
+| `!session create <name> [cli]` | `!s c` | Create a new session (optionally specify CLI tool) |
+| `!session list` | `!s ls` | List all sessions + status |
+| `!session switch <name>` | `!s sw` | Switch active session |
+| `!session info [name]` | `!s` | Show session details |
+| `!session new [name]` | `!s new` | Reset session conversation |
+| `!session kill [name]` | `!s stop` | Kill running AI process |
+| `!session delete <name>` | `!s rm` | Delete a session |
+| `!session stats [name]` | `!s stat` | Show token usage statistics |
+| `!session history [name] [count]` | `!s h` | View conversation history |
+
+### Task Queue
+
+| Command | Alias | Description |
+|:--------|:------|:------------|
 | `!task add <task>` | `!t a` | Add a scheduled task |
 | `!task list` | `!t ls` | List scheduled tasks |
 | `!task run` | `!t r` | Run all pending tasks sequentially |
 | `!task remove <id>` | `!t rm` | Remove a task |
 | `!task clear` | `!t c` | Clear all pending tasks |
 | `!task stop` | `!t s` | Stop running tasks |
+
+### Git Tools
+
+| Command | Alias | Description |
+|:--------|:------|:------------|
+| `!diff` | `!d`, `!changes` | Visualize git diff as PNG image |
+| `!diff --staged` | `!d -s` | Show staged changes only |
+| `!diff <file>` | | Show diff for a specific file |
+| `!diff HEAD~1` | | Compare with a specific commit |
+
+### System
+
+| Command | Alias | Description |
+|:--------|:------|:------------|
 | `!exec <command>` | `!run`, `!cmd` | Execute CMD command |
-| `!status` | `!sysinfo` | System info |
+| `!status` | `!sysinfo` | System info (CPU, memory, uptime) |
 | `!myid` | `!id` | Check Discord ID |
 | `!help` | | Show help |
 
@@ -98,10 +146,10 @@ Type `!ask review my code` in Discord!
 | Tool | Integration | Interactive | Session |
 |:-----|:-----------|:-----------:|:-------:|
 | **Claude Code** | Agent SDK | ✅ | ✅ |
-| **Gemini CLI** | subprocess | ❌ | ❌ |
+| **Gemini CLI** | Stream JSON | ❌ | ❌ |
 | **OpenCode** | subprocess | ❌ | ❌ |
 
-> **Claude Code** communicates directly via Agent SDK. When AI asks for choices, you can respond with Discord buttons!
+> **Claude Code** communicates directly via Agent SDK. When AI asks for choices, you can respond with Discord buttons/dropdowns! (4 or fewer options → buttons, 5+ → dropdown menu)
 
 ---
 
@@ -111,7 +159,7 @@ Type `!ask review my code` in Discord!
 <summary><b>Method 1: exe File (Recommended)</b></summary>
 
 ### Prerequisites
-- **Node.js v18+** (required for Claude Code)
+- **Node.js v18+** (auto-download attempted if missing)
 - Claude Code auth (`claude login` or `ANTHROPIC_API_KEY`)
 
 ### Install
@@ -168,14 +216,34 @@ npx tsx src/bot.ts
 | `ALLOWED_USER_IDS` | ✅ | — | Allowed user IDs (comma-separated) |
 | `ANTHROPIC_API_KEY` | ❌ | — | API key (not needed with `claude login`) |
 | `COMMAND_PREFIX` | ❌ | `!` | Command prefix |
-| `COMMAND_TIMEOUT` | ❌ | `30` | CMD timeout (seconds) |
-| `AI_CLI_TIMEOUT` | ❌ | `300` | AI timeout (seconds) |
+| `COMMAND_TIMEOUT` | ❌ | `30` | CMD timeout (seconds, range: 5–120) |
+| `AI_CLI_TIMEOUT` | ❌ | `300` | AI timeout (seconds, range: 30–1800) |
 
 ### Multiple Users
 
 ```env
 ALLOWED_USER_IDS=111111111111111111,222222222222222222
 ```
+
+---
+
+## 🔒 Security
+
+<details>
+<summary><b>Security Features</b></summary>
+
+| Feature | Description |
+|:--------|:------------|
+| **Whitelist Access Control** | Only users registered in `ALLOWED_USER_IDS` can use the bot |
+| **Dangerous Command Blocking** | Blocks `format`, `shutdown`, `del /s`, `powershell`, and other dangerous commands/executables |
+| **Prompt Injection Detection** | Warns on suspicious patterns: role reassignment, system prompt injection, jailbreak attempts |
+| **Output Sanitization** | Auto-redacts API keys, tokens, user paths, and other sensitive data |
+| **Sensitive File Filtering** | Automatically excludes `.env`, `credentials`, `secrets`, etc. from diffs |
+| **Security Context Wrapping** | Injects working directory restriction rules into AI tools |
+
+See [SECURITY.md](SECURITY.md) for detailed security policies.
+
+</details>
 
 ---
 
@@ -245,6 +313,17 @@ dist/
 ```
 
 </details>
+
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|:---------|:------------|
+| [GUIDE.md](GUIDE.md) | Detailed user & developer guide |
+| [SECURITY.md](SECURITY.md) | Security policies |
+| [CHANGELOG.md](CHANGELOG.md) | Version history |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guide |
 
 ---
 
