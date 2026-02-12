@@ -13,6 +13,8 @@ import {
 import { getMultiSessionManager } from "../sessions/multiSession.js";
 import { checkPromptInjection } from "../utils/promptGuard.js";
 import type { SlashCommand } from "./index.js";
+import type { PlatformMessage } from "../platform/types.js";
+import { getDiscordAdapter } from "../platform/discordAdapter.js";
 
 const data = new SlashCommandBuilder()
   .setName("task")
@@ -129,10 +131,20 @@ async function execute(interaction: ChatInputCommandInteraction, client: BotClie
         const task = pending[i];
         await updateTaskStatus(client.workingDir, task.id, "running");
         try {
+          const platformMsg: PlatformMessage = {
+            platform: "discord",
+            userId: interaction.user.id,
+            displayName: interaction.user.displayName ?? interaction.user.username,
+            channelId: interaction.channelId,
+            content: task.content,
+            raw: interaction,
+          };
+          const adapter = getDiscordAdapter();
           const result = await multiSession.sendMessage(
             null,
             task.content,
-            interaction as unknown as any,
+            platformMsg,
+            adapter,
           );
           await updateTaskStatus(client.workingDir, task.id, "completed", result);
           completed++;

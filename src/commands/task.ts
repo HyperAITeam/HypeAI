@@ -1,6 +1,7 @@
 import type { TextChannel } from "discord.js";
 import type { PrefixCommand, CommandContext } from "../types.js";
 import { isAllowedUser } from "../utils/security.js";
+import { discordToPlatformMessage, getDiscordAdapter } from "../platform/discordAdapter.js";
 import {
   addTask,
   removeTask,
@@ -196,8 +197,10 @@ async function handleRun(ctx: CommandContext): Promise<void> {
 
     try {
       // 기본 세션으로 메시지 전송
+      const platformMsg = discordToPlatformMessage(ctx.message);
+      const adapter = getDiscordAdapter();
       const result = await withTyping(ctx.message, () =>
-        multiSession.sendMessage(null, task.content, ctx.message),
+        multiSession.sendMessage(null, task.content, platformMsg, adapter),
       );
 
       await updateTaskStatus(ctx.client.workingDir, task.id, "completed", result);

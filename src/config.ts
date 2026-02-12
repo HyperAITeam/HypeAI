@@ -85,6 +85,12 @@ export function reloadConfig(): void {
   );
   APPLICATION_ID = process.env.APPLICATION_ID ?? "";
   SLASH_COMMAND_GUILD_ID = process.env.SLASH_COMMAND_GUILD_ID ?? "";
+
+  // LINE
+  LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN ?? "";
+  LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET ?? "";
+  LINE_WEBHOOK_PORT = parseInt(process.env.LINE_WEBHOOK_PORT ?? "3000", 10);
+  ALLOWED_LINE_USER_IDS = parseLineUserIds(process.env.ALLOWED_LINE_USER_IDS ?? "");
 }
 
 // CLI tool definitions
@@ -169,3 +175,16 @@ export let SLASH_COMMAND_GUILD_ID = process.env.SLASH_COMMAND_GUILD_ID ?? "";
 
 // Discord message limit
 export const DISCORD_MAX_LENGTH = 2000;
+
+// LINE Messaging API
+function parseLineUserIds(raw: string): Set<string> {
+  return new Set(
+    raw.split(",").map((id) => id.trim()).filter(Boolean),
+  );
+}
+
+export let LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN ?? "";
+export let LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET ?? "";
+export let LINE_WEBHOOK_PORT = parseInt(process.env.LINE_WEBHOOK_PORT ?? "3000", 10);
+export let ALLOWED_LINE_USER_IDS = parseLineUserIds(process.env.ALLOWED_LINE_USER_IDS ?? "");
+export const LINE_MAX_LENGTH = 5000;

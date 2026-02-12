@@ -4,7 +4,7 @@
 
 ### Your AI Codes While You Sleep
 
-Control AI CLI tools on your PC remotely via Discord
+Control AI CLI tools on your PC remotely via Discord / LINE
 
 [![GitHub release](https://img.shields.io/github/v/release/OsgoodYZ/osgoodAI?style=flat-square)](../../releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
@@ -39,13 +39,13 @@ Control AI CLI tools on your PC remotely via Discord
 <td width="50%">
 
 ### 🤖 Remote AI Control
-Control Claude Code, Gemini CLI, OpenCode remotely via Discord messages
+Control Claude Code, Gemini CLI, OpenCode remotely via Discord / LINE messages
 
 </td>
 <td width="50%">
 
 ### 💬 Interactive Responses
-When Claude asks questions, respond instantly with Discord buttons/dropdowns
+When Claude asks questions, respond instantly with Discord buttons or LINE Quick Reply
 
 </td>
 </tr>
@@ -74,6 +74,20 @@ Create, switch, and manage multiple named AI sessions simultaneously
 
 ### 📊 Git Diff Visualization
 Render git diffs as PNG images viewable directly in Discord
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 📱 Multi-Platform
+Supports Discord and LINE simultaneously. Use one or both platforms
+
+</td>
+<td width="50%">
+
+### 🔌 Easy Deployment
+Connect LINE webhook without a dedicated server using Cloudflare Tunnel
 
 </td>
 </tr>
@@ -159,7 +173,7 @@ Type `!ask review my code` in Discord!
 | **Gemini CLI** | Stream JSON | ✅ | ✅ |
 | **OpenCode** | subprocess | ❌ | ❌ |
 
-> **Claude Code & Gemini CLI** support interactive responses. When AI asks for choices, you can respond with Discord buttons/dropdowns! (4 or fewer options → buttons, 5+ → dropdown menu)
+> **Claude Code & Gemini CLI** support interactive responses. When AI asks for choices, respond with Discord buttons/dropdowns or LINE Quick Reply!
 
 ---
 
@@ -222,12 +236,18 @@ npx tsx src/bot.ts
 
 | Variable | Required | Default | Description |
 |:---------|:--------:|:-------:|:------------|
-| `DISCORD_BOT_TOKEN` | ✅ | — | Discord bot token |
-| `ALLOWED_USER_IDS` | ✅ | — | Allowed user IDs (comma-separated) |
+| `DISCORD_BOT_TOKEN` | ⚡ | — | Discord bot token (required for Discord) |
+| `ALLOWED_USER_IDS` | ⚡ | — | Allowed Discord user IDs (comma-separated) |
 | `ANTHROPIC_API_KEY` | ❌ | — | API key (not needed with `claude login`) |
 | `COMMAND_PREFIX` | ❌ | `!` | Command prefix |
 | `COMMAND_TIMEOUT` | ❌ | `30` | CMD timeout (seconds, range: 5–120) |
 | `AI_CLI_TIMEOUT` | ❌ | `300` | AI timeout (seconds, range: 30–1800) |
+| `LINE_CHANNEL_ACCESS_TOKEN` | ⚡ | — | LINE channel access token (required for LINE) |
+| `LINE_CHANNEL_SECRET` | ⚡ | — | LINE channel secret (required for LINE) |
+| `LINE_WEBHOOK_PORT` | ❌ | `3000` | LINE webhook server port |
+| `ALLOWED_LINE_USER_IDS` | ⚡ | — | Allowed LINE user IDs (comma-separated) |
+
+> ⚡ = Required for the respective platform. If you only use Discord, LINE settings are not needed, and vice versa.
 
 ### Multiple Users
 
@@ -280,6 +300,92 @@ See [SECURITY.md](SECURITY.md) for detailed security policies.
 
 ---
 
+## 💚 Setting Up LINE Bot
+
+<details>
+<summary><b>Expand detailed guide</b></summary>
+
+LINE support currently requires manual installation only.
+
+### Step 1: Create LINE Official Account
+
+1. Go to [LINE Official Account Manager](https://manager.line.biz/) → Log in
+2. **Create new account** → Enter account name (e.g., `AIDevelop Bot`)
+3. Select category → Complete creation
+
+### Step 2: Enable Messaging API
+
+1. Select the created account → **Settings** → **Messaging API** tab
+2. Click **Enable Messaging API** → Select a provider (or create new one)
+3. Verify the channel at [LINE Developers Console](https://developers.line.biz/console/)
+
+### Step 3: Copy Token & Secret
+
+Go to [LINE Developers Console](https://developers.line.biz/console/) → Select channel:
+
+1. **Basic settings** tab → Copy `Channel secret`
+2. **Messaging API** tab → `Channel access token` → Click **Issue** → Copy token
+
+### Step 4: Configure .env
+
+Add the following to your existing `.env` file:
+
+```env
+LINE_CHANNEL_ACCESS_TOKEN=your_access_token
+LINE_CHANNEL_SECRET=your_channel_secret
+LINE_WEBHOOK_PORT=3000
+ALLOWED_LINE_USER_IDS=your_line_user_id
+```
+
+> LINE user ID can be found at [LINE Developers Console](https://developers.line.biz/console/) → Basic settings → `Your user ID` (string starting with U)
+
+### Step 5: Set Up Webhook URL
+
+LINE operates via webhooks, so your bot server must be accessible from the internet.
+
+**Local testing (Cloudflare Tunnel — free)**:
+```bash
+# 1. Install Cloudflare Tunnel (one time)
+winget install cloudflare.cloudflared
+
+# 2. Run tunnel (in a separate terminal while bot is running)
+cloudflared tunnel --url http://localhost:3000
+```
+
+Copy the URL shown after running (e.g., `https://xxxx-xxxx.trycloudflare.com`).
+
+**Production**: Run the bot on a server with a fixed domain, or use a reverse proxy (nginx, etc.).
+
+### Step 6: Register LINE Webhook
+
+1. [LINE Developers Console](https://developers.line.biz/console/) → Channel → **Messaging API** tab
+2. **Webhook URL** → Enter `https://your-url/webhook` → **Update**
+3. **Use webhook** → Enable
+4. Click **Verify** → Confirm `Success`
+
+### Step 7: Disable Auto-Response
+
+1. [LINE Official Account Manager](https://manager.line.biz/) → Select account
+2. **Response settings**
+3. **Response messages** → **Off**
+4. **Webhook** → **On**
+
+> If auto-response is enabled, LINE will send default responses instead of your bot's replies.
+
+### Step 8: Run & Test
+
+```bash
+npx tsx src/bot.ts
+```
+
+If the console shows `[platform] Active: Discord + LINE` (or `LINE only`), it's working!
+
+Send `!ask hello` to the bot in LINE to test.
+
+</details>
+
+---
+
 ## 🛠️ Troubleshooting
 
 <details>
@@ -291,7 +397,10 @@ See [SECURITY.md](SECURITY.md) for detailed security policies.
 | `Node.js is not installed` | Install [Node.js v18+](https://nodejs.org/) |
 | Claude auth error | Run `claude login` or set API key |
 | `You are not authorized` | Check ID with `!myid` → Add to `.env` |
-| Bot not responding | Enable **Message Content Intent** |
+| Bot not responding (Discord) | Enable **Message Content Intent** |
+| LINE bot not responding | 1) Check webhook URL ends with `/webhook` 2) Enable **Use webhook** 3) Disable **Response messages** |
+| LINE webhook Verify fails | Ensure bot is running. If using Cloudflare Tunnel, tunnel must also be running |
+| No response from LINE | Check `ALLOWED_LINE_USER_IDS` includes your ID |
 
 </details>
 
@@ -377,7 +486,7 @@ Can't decide who to support? Spin the wheel!
 
 <div align="center">
 
-**Code with AI from anywhere via Discord** 🚀
+**Code with AI from anywhere via Discord / LINE** 🚀
 
 [⬆ Back to Top](#ai-cli-gateway-bot)
 

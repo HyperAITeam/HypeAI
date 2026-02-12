@@ -1,6 +1,6 @@
-import type { Message } from "discord.js";
 import type { ISessionManager } from "./types.js";
 import type { NamedSession } from "../types.js";
+import type { PlatformMessage, PlatformAdapter } from "../platform/types.js";
 import { CLI_TOOLS } from "../config.js";
 import { createSession } from "../bot.js";
 import { wrapWithSecurityContext } from "../utils/promptGuard.js";
@@ -172,7 +172,8 @@ export class MultiSessionManager {
   async sendMessage(
     sessionName: string | null,
     message: string,
-    discordMessage: Message,
+    platformMessage: PlatformMessage,
+    adapter: PlatformAdapter,
     onProgress?: (status: string) => void,
   ): Promise<string> {
     const targetName = sessionName ?? this.activeSessionName;
@@ -199,7 +200,7 @@ export class MultiSessionManager {
     // Use session-specific cwd for security context
     const sessionCwd = session.cwd;
     const wrappedMessage = wrapWithSecurityContext(message, sessionCwd);
-    const result = await session.manager.sendMessage(wrappedMessage, discordMessage, onProgress);
+    const result = await session.manager.sendMessage(wrappedMessage, platformMessage, adapter, onProgress);
     this.schedulePersist();
     return result;
   }
