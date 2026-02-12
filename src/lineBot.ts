@@ -229,7 +229,7 @@ export class LineBotServer {
     try {
       await handler(ctx);
     } catch (err: any) {
-      console.error(`  [LINE] Command ${cmdName} error:`, err);
+      console.error("  [LINE] Command %s error:", cmdName, err);
       audit(AuditEvent.COMMAND_ERROR, ctx.message.userId, {
         command: cmdName,
         success: false,
