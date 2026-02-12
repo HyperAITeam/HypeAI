@@ -129,28 +129,11 @@ export async function getGitDiff(cwd: string, options: DiffOptions = {}): Promis
       const untrackedFiles = untrackedOutput.split("\n").filter(Boolean);
 
       for (const filePath of untrackedFiles) {
-        // Generate diff for untracked file
-        let fileDiff = "";
-        try {
-          fileDiff = await execGit(
-            ["diff", "--no-index", "--", "/dev/null", filePath],
-            cwd,
-          );
-        } catch (err: any) {
-          // git diff --no-index exits with code 1 when there are differences (expected)
-          if (err.message && !err.message.includes("exited with code")) {
-            continue;
-          }
-          // The diff content is in the error message or we need to capture stdout
-          // Actually, execGit rejects on non-zero exit, but the stdout is lost.
-          // Use a different approach: read the file and build diff manually.
-          fileDiff = await buildUntrackedFileDiff(filePath, cwd);
-        }
+        const fileDiff = await buildUntrackedFileDiff(filePath, cwd);
 
         if (fileDiff) {
           raw += (raw ? "\n" : "") + fileDiff;
 
-          // Count lines for stats
           const lineCount = fileDiff.split("\n").filter((l) => l.startsWith("+") && !l.startsWith("+++")).length;
           files.push({
             path: filePath,
