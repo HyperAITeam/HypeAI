@@ -22,6 +22,16 @@ Control AI CLI tools on your PC remotely via Discord
 
 ---
 
+## 💡 Who Is This For?
+
+- 🛏️ **Queue tasks before bed** and check results in the morning
+- 📱 **Keep coding from your phone** while your home PC runs AI
+- 🤖 **Control Claude Code remotely** from anywhere
+- ⌨️ **Respond to AI questions with button clicks** when it asks "What should I do?"
+- 📋 **Schedule multiple tasks** to run sequentially
+
+---
+
 ## ✨ Key Features
 
 <table>
@@ -146,10 +156,10 @@ Type `!ask review my code` in Discord!
 | Tool | Integration | Interactive | Session |
 |:-----|:-----------|:-----------:|:-------:|
 | **Claude Code** | Agent SDK | ✅ | ✅ |
-| **Gemini CLI** | Stream JSON | ❌ | ❌ |
+| **Gemini CLI** | Stream JSON | ✅ | ✅ |
 | **OpenCode** | subprocess | ❌ | ❌ |
 
-> **Claude Code** communicates directly via Agent SDK. When AI asks for choices, you can respond with Discord buttons/dropdowns! (4 or fewer options → buttons, 5+ → dropdown menu)
+> **Claude Code & Gemini CLI** support interactive responses. When AI asks for choices, you can respond with Discord buttons/dropdowns! (4 or fewer options → buttons, 5+ → dropdown menu)
 
 ---
 
@@ -338,6 +348,16 @@ Contributions are welcome! Please check [CONTRIBUTING.md](CONTRIBUTING.md).
 If this project helped you, buy us a coffee!
 
 <div align="center">
+
+### 🎰 Random Supporter Roulette
+
+Can't decide who to support? Spin the wheel!
+
+[![Random Supporter Roulette](https://img.shields.io/badge/🎰_SPIN_THE_WHEEL!-FF6B6B?style=for-the-badge&logoColor=white)](https://hyperaiteam.github.io/HypeAI/roulette.html)
+
+---
+
+### Direct Support
 
 | Maintainer | Support |
 |:----------:|:-------:|
