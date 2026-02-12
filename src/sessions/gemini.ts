@@ -1,8 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import type { Message, TextChannel } from "discord.js";
 import type { ISessionManager, SessionInfo, SessionStats, HistoryEntry } from "./types.js";
 import type { CliTool } from "../types.js";
-import { handleAskUserQuestion } from "../utils/discordPrompt.js";
+import type { PlatformMessage, PlatformAdapter } from "../platform/types.js";
 import { buildSafeShellCmd } from "../utils/shellEscape.js";
 import { sanitizeOutput } from "../utils/sanitizeOutput.js";
 import { withRetry } from "../utils/retry.js";
@@ -68,12 +67,16 @@ export class GeminiSessionManager implements ISessionManager {
     return this.proc !== null && this.proc.exitCode === null;
   }
 
-  async sendMessage(message: string, discordMessage: Message): Promise<string> {
+  async sendMessage(
+    message: string,
+    platformMessage: PlatformMessage,
+    adapter: PlatformAdapter,
+  ): Promise<string> {
     this.lastMessage = message;
 
     try {
       const resultText = await withRetry(
-        () => this._executeQuery(message, discordMessage),
+        () => this._executeQuery(message, platformMessage, adapter),
         {
           maxRetries: RETRY_MAX_ATTEMPTS,
           baseDelayMs: RETRY_BASE_DELAY_MS,
@@ -81,15 +84,14 @@ export class GeminiSessionManager implements ISessionManager {
           backoffMultiplier: 2,
         },
         async (attempt, error, delayMs) => {
-          audit(AuditEvent.RETRY_ATTEMPTED, discordMessage.author.id, {
+          audit(AuditEvent.RETRY_ATTEMPTED, platformMessage.userId, {
             details: { attempt, error: error.message, delayMs },
           });
           const secs = Math.ceil(delayMs / 1000);
-          if ("send" in discordMessage.channel) {
-            await discordMessage.channel.send(
-              `Retry ${attempt}/${RETRY_MAX_ATTEMPTS} in ${secs}s... (${error.message})`,
-            ).catch(() => {});
-          }
+          await adapter.reply(
+            platformMessage,
+            `Retry ${attempt}/${RETRY_MAX_ATTEMPTS} in ${secs}s... (${error.message})`,
+          ).catch(() => {});
         },
       );
 
@@ -111,7 +113,11 @@ export class GeminiSessionManager implements ISessionManager {
     }
   }
 
-  private _executeQuery(message: string, discordMessage: Message): Promise<string> {
+  private _executeQuery(
+    message: string,
+    platformMessage: PlatformMessage,
+    adapter: PlatformAdapter,
+  ): Promise<string> {
     const cmd = this.buildCommand(message);
     const shellCmd = buildSafeShellCmd(cmd);
 
@@ -161,7 +167,8 @@ export class GeminiSessionManager implements ISessionManager {
                   await this.handleToolUse(
                     event.tool_name,
                     event.tool_input,
-                    discordMessage,
+                    platformMessage,
+                    adapter,
                   );
                 }
                 break;
@@ -344,30 +351,24 @@ export class GeminiSessionManager implements ISessionManager {
 
   /**
    * Handle Gemini tool_use events that require user interaction.
-   * Maps to Discord UI via handleAskUserQuestion.
+   * Uses the platform adapter to ask questions.
    */
   private async handleToolUse(
     toolName: string,
     input: Record<string, unknown>,
-    discordMessage: Message,
+    platformMessage: PlatformMessage,
+    adapter: PlatformAdapter,
   ): Promise<void> {
-    // Gemini's ask_followup tool structure (hypothetical - adjust based on actual format)
     if (toolName === "ask_followup" && input.question) {
-      const questions = [
-        {
-          question: String(input.question),
-          header: "Gemini asks",
-          options: Array.isArray(input.options)
-            ? (input.options as string[]).map((opt) => ({ label: opt }))
-            : [{ label: "Yes" }, { label: "No" }],
-        },
-      ];
+      const options = Array.isArray(input.options)
+        ? (input.options as string[]).map((opt) => ({ label: opt }))
+        : [{ label: "Yes" }, { label: "No" }];
 
-      await handleAskUserQuestion(
-        { questions },
-        discordMessage.channel as TextChannel,
-        discordMessage.author.id,
-      );
+      await adapter.askQuestion(platformMessage, {
+        question: String(input.question),
+        header: "Gemini asks",
+        options,
+      });
     }
   }
 }

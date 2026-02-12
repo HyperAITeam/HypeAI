@@ -2,10 +2,9 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import path from "node:path";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
-import type { Message, TextChannel } from "discord.js";
 import type { ISessionManager, SessionInfo, SessionStats, HistoryEntry } from "./types.js";
 import type { CliTool } from "../types.js";
-import { handleAskUserQuestion } from "../utils/discordPrompt.js";
+import type { PlatformMessage, PlatformAdapter, InteractiveQuestion } from "../platform/types.js";
 import { withRetry } from "../utils/retry.js";
 import { RETRY_MAX_ATTEMPTS, RETRY_BASE_DELAY_MS } from "../config.js";
 import { audit, AuditEvent } from "../utils/auditLog.js";
@@ -115,13 +114,18 @@ export class ClaudeSessionManager implements ISessionManager {
     return this.busy;
   }
 
-  async sendMessage(message: string, discordMessage: Message, onProgress?: (status: string) => void): Promise<string> {
+  async sendMessage(
+    message: string,
+    platformMessage: PlatformMessage,
+    adapter: PlatformAdapter,
+    onProgress?: (status: string) => void,
+  ): Promise<string> {
     this.busy = true;
     this.abortController = new AbortController();
 
     try {
       const resultText = await withRetry(
-        () => this._executeQuery(message, discordMessage, onProgress),
+        () => this._executeQuery(message, platformMessage, adapter, onProgress),
         {
           maxRetries: RETRY_MAX_ATTEMPTS,
           baseDelayMs: RETRY_BASE_DELAY_MS,
@@ -129,15 +133,14 @@ export class ClaudeSessionManager implements ISessionManager {
           backoffMultiplier: 2,
         },
         async (attempt, error, delayMs) => {
-          audit(AuditEvent.RETRY_ATTEMPTED, discordMessage.author.id, {
+          audit(AuditEvent.RETRY_ATTEMPTED, platformMessage.userId, {
             details: { attempt, error: error.message, delayMs },
           });
           const secs = Math.ceil(delayMs / 1000);
-          if ("send" in discordMessage.channel) {
-            await discordMessage.channel.send(
-              `Retry ${attempt}/${RETRY_MAX_ATTEMPTS} in ${secs}s... (${error.message})`,
-            ).catch(() => {});
-          }
+          await adapter.reply(
+            platformMessage,
+            `Retry ${attempt}/${RETRY_MAX_ATTEMPTS} in ${secs}s... (${error.message})`,
+          ).catch(() => {});
         },
       );
 
@@ -162,7 +165,12 @@ export class ClaudeSessionManager implements ISessionManager {
     }
   }
 
-  private async _executeQuery(message: string, discordMessage: Message, onProgress?: (status: string) => void): Promise<string> {
+  private async _executeQuery(
+    message: string,
+    platformMessage: PlatformMessage,
+    adapter: PlatformAdapter,
+    onProgress?: (status: string) => void,
+  ): Promise<string> {
     const cliPath = resolveClaudeCodePath();
     const nodePath = await resolveNodeExecutable();
     console.log(`  [Claude] cliPath: ${cliPath ?? "(SDK default)"}`);
@@ -208,12 +216,31 @@ export class ClaudeSessionManager implements ISessionManager {
         input: Record<string, unknown>,
       ) => {
         if (toolName === "AskUserQuestion") {
-          const result = await handleAskUserQuestion(
-            input as any,
-            discordMessage.channel as TextChannel,
-            discordMessage.author.id,
-          );
-          return { behavior: "allow" as const, updatedInput: result };
+          const questions = (input as any).questions as Array<{
+            question: string;
+            header?: string;
+            options: { label: string; description?: string }[];
+            multiSelect?: boolean;
+          }> | undefined;
+
+          if (questions && questions.length > 0) {
+            const answers: Record<string, string> = {};
+            for (const q of questions) {
+              const iq: InteractiveQuestion = {
+                question: q.question,
+                header: q.header,
+                options: q.options,
+                multiSelect: q.multiSelect,
+              };
+              const answer = await adapter.askQuestion(platformMessage, iq);
+              answers[q.question] = answer;
+            }
+            return {
+              behavior: "allow" as const,
+              updatedInput: { questions, answers },
+            };
+          }
+          return { behavior: "allow" as const, updatedInput: input };
         }
         return { behavior: "allow" as const, updatedInput: input };
       },

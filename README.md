@@ -4,7 +4,7 @@
 
 ### 잠든 사이에도 AI가 코딩한다
 
-Discord에서 PC의 AI CLI 도구를 원격 제어하세요
+Discord / LINE에서 PC의 AI CLI 도구를 원격 제어하세요
 
 [![GitHub release](https://img.shields.io/github/v/release/OsgoodYZ/osgoodAI?style=flat-square)](../../releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
@@ -39,13 +39,13 @@ Discord에서 PC의 AI CLI 도구를 원격 제어하세요
 <td width="50%">
 
 ### 🤖 AI 원격 제어
-Discord 메시지로 Claude Code, Gemini CLI, OpenCode를 원격으로 조작
+Discord / LINE 메시지로 Claude Code, Gemini CLI, OpenCode를 원격으로 조작
 
 </td>
 <td width="50%">
 
 ### 💬 인터랙티브 응답
-Claude가 물어보면 Discord 버튼/드롭다운으로 바로 응답
+Claude가 물어보면 Discord 버튼 / LINE Quick Reply로 바로 응답
 
 </td>
 </tr>
@@ -74,6 +74,20 @@ exe 파일 더블클릭으로 바로 시작 (Node.js 자동 다운로드)
 
 ### 📊 Git Diff 시각화
 git diff를 PNG 이미지로 렌더링하여 Discord에서 바로 확인
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 📱 멀티 플랫폼
+Discord와 LINE을 동시에 지원. 플랫폼 하나만 또는 둘 다 사용 가능
+
+</td>
+<td width="50%">
+
+### 🔌 쉬운 배포
+Cloudflare Tunnel 등으로 별도 서버 없이 LINE 웹훅 연동 가능
 
 </td>
 </tr>
@@ -159,7 +173,7 @@ Discord에서 `!ask 코드 리뷰해줘` 입력!
 | **Gemini CLI** | Stream JSON | ✅ | ✅ |
 | **OpenCode** | subprocess | ❌ | ❌ |
 
-> **Claude Code & Gemini CLI**는 AI가 선택지를 물어보면 Discord 버튼/드롭다운으로 응답할 수 있어요! (4개 이하 → 버튼, 5개 이상 → 드롭다운 메뉴)
+> **Claude Code & Gemini CLI**는 AI가 선택지를 물어보면 Discord 버튼/드롭다운 또는 LINE Quick Reply로 응답할 수 있어요!
 
 ---
 
@@ -222,13 +236,19 @@ npx tsx src/bot.ts
 
 | 변수 | 필수 | 기본값 | 설명 |
 |:-----|:----:|:------:|:-----|
-| `DISCORD_BOT_TOKEN` | ✅ | — | Discord 봇 토큰 |
-| `ALLOWED_USER_IDS` | ✅ | — | 허용할 유저 ID (17-19자리 숫자, 쉼표 구분) |
+| `DISCORD_BOT_TOKEN` | ⚡ | — | Discord 봇 토큰 (Discord 사용 시 필수) |
+| `ALLOWED_USER_IDS` | ⚡ | — | 허용할 Discord 유저 ID (쉼표 구분) |
 | `ANTHROPIC_API_KEY` | ❌ | — | API 키 (`claude login` 시 불필요) |
 | `COMMAND_PREFIX` | ❌ | `!` | 명령어 접두사 |
 | `COMMAND_TIMEOUT` | ❌ | `30` | CMD 타임아웃 (초, 범위: 5~120) |
 | `AI_CLI_TIMEOUT` | ❌ | `300` | AI 타임아웃 (초, 범위: 30~1800) |
+| `LINE_CHANNEL_ACCESS_TOKEN` | ⚡ | — | LINE 채널 액세스 토큰 (LINE 사용 시 필수) |
+| `LINE_CHANNEL_SECRET` | ⚡ | — | LINE 채널 시크릿 (LINE 사용 시 필수) |
+| `LINE_WEBHOOK_PORT` | ❌ | `3000` | LINE 웹훅 서버 포트 |
+| `ALLOWED_LINE_USER_IDS` | ⚡ | — | 허용할 LINE 유저 ID (쉼표 구분) |
 
+> ⚡ = 해당 플랫폼 사용 시 필수. Discord만 사용하면 LINE 설정은 불필요하고, LINE만 사용하면 Discord 설정은 불필요합니다.
+>
 > ⚠️ **보안 주의**: Discord ID는 17-19자리 **숫자**입니다 (유저네임 ❌). ID는 외부에 노출하지 마세요!
 
 ### 여러 유저 허용
@@ -282,6 +302,92 @@ ALLOWED_USER_IDS=111111111111111111,222222222222222222
 
 ---
 
+## 💚 LINE 봇 만들기
+
+<details>
+<summary><b>상세 가이드 펼치기</b></summary>
+
+현재 LINE의 경우 수동 설치 방법만을 지원합니다.
+
+### Step 1: LINE Official Account 생성
+
+1. [LINE Official Account Manager](https://manager.line.biz/) 접속 → 로그인
+2. **새 계정 만들기** → 계정 이름 입력 (예: `AIDevelop Bot`)
+3. 카테고리 선택 → 계정 생성 완료
+
+### Step 2: Messaging API 활성화
+
+1. 생성된 계정의 **설정** → **Messaging API** 탭
+2. **Messaging API 사용** 클릭 → LINE Developers 제공자 선택 (없으면 새로 생성)
+3. 활성화 완료 후 [LINE Developers Console](https://developers.line.biz/console/) 에서 채널 확인
+
+### Step 3: 토큰 & 시크릿 복사
+
+[LINE Developers Console](https://developers.line.biz/console/) → 채널 선택:
+
+1. **Basic settings** 탭 → `Channel secret` 복사
+2. **Messaging API** 탭 → `Channel access token` → **Issue** 클릭 → 토큰 복사
+
+### Step 4: .env 설정
+
+이미 생성된 .env 파일을 열어 아래 내용을 추가
+
+```env
+LINE_CHANNEL_ACCESS_TOKEN=발급받은_액세스_토큰
+LINE_CHANNEL_SECRET=발급받은_채널_시크릿
+LINE_WEBHOOK_PORT=3000
+ALLOWED_LINE_USER_IDS=내_LINE_유저_ID
+```
+
+> LINE 유저 ID는 [LINE Developers Console](https://developers.line.biz/console/) → Basic settings → `Your user ID`에서 확인 (U로 시작하는 문자열)
+
+### Step 5: 웹훅 URL 설정
+
+LINE은 웹훅 방식으로 동작하므로, 봇 서버가 외부에서 접근 가능해야 합니다.
+
+**로컬 테스트 (Cloudflare Tunnel 무료)**:
+```bash
+# 1. Cloudflare Tunnel 설치 (한 번만)
+winget install cloudflare.cloudflared
+
+# 2. 터널 실행 (봇 실행 중에 별도 터미널에서)
+cloudflared tunnel --url http://localhost:3000
+```
+
+터널 실행 후 표시되는 URL (예: `https://xxxx-xxxx.trycloudflare.com`)을 복사합니다.
+
+**운영 환경**: 고정 도메인이 있는 서버에서 봇을 실행하거나, 리버스 프록시(nginx 등)를 사용하세요.
+
+### Step 6: LINE 웹훅 등록
+
+1. [LINE Developers Console](https://developers.line.biz/console/) → 채널 → **Messaging API** 탭
+2. **Webhook URL** → `https://xxxx-xxxx.trycloudflare.com/webhook` 입력 → **Update**
+3. **Use webhook** → 켜기
+4. **Verify** 클릭 → `Success` 확인
+
+### Step 7: 자동 응답 끄기
+
+1. [LINE Official Account Manager](https://manager.line.biz/) → 계정 선택
+2. **응답 설정** (또는 **Settings** → **Response settings**)
+3. **응답 메시지** → **끄기**
+4. **Webhook** → **켜기**
+
+> 자동 응답이 켜져 있으면 봇 응답 대신 기본 자동 응답이 전송됩니다.
+
+### Step 8: 봇 실행 & 테스트
+
+```bash
+npx tsx src/bot.ts
+```
+
+콘솔에 `[platform] Active: Discord + LINE` (또는 `LINE only`)이 표시되면 성공!
+
+LINE에서 봇에게 `!ask 안녕` 메시지를 보내 테스트하세요.
+
+</details>
+
+---
+
 ## 🛠️ 문제 해결
 
 <details>
@@ -293,7 +399,10 @@ ALLOWED_USER_IDS=111111111111111111,222222222222222222
 | `Node.js가 설치되어 있지 않습니다` | [Node.js v18+](https://nodejs.org/) 설치 |
 | Claude 인증 에러 | `claude login` 실행 또는 API 키 설정 |
 | `You are not authorized` | `!myid`로 ID 확인 → `.env`에 추가 |
-| 봇이 반응 없음 | **Message Content Intent** 활성화 확인 |
+| 봇이 반응 없음 (Discord) | **Message Content Intent** 활성화 확인 |
+| LINE 봇이 반응 없음 | 1) 웹훅 URL이 `/webhook`으로 끝나는지 확인 2) **Use webhook** 켜기 3) **응답 메시지** 끄기 |
+| LINE 웹훅 Verify 실패 | 봇이 실행 중인지 확인. Cloudflare Tunnel 사용 시 터널도 실행 중이어야 함 |
+| LINE에서 결과가 안 와요 | `ALLOWED_LINE_USER_IDS`에 본인 ID가 등록되어 있는지 확인 |
 
 </details>
 
@@ -379,7 +488,7 @@ dist/
 
 <div align="center">
 
-**Discord로 어디서든 AI와 코딩하세요** 🚀
+**Discord / LINE으로 어디서든 AI와 코딩하세요** 🚀
 
 [⬆ 맨 위로](#ai-cli-gateway-bot)
 

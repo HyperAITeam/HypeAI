@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, type ChatInputCommandInteraction, type Message } from "discord.js";
+import { SlashCommandBuilder, type ChatInputCommandInteraction } from "discord.js";
 import path from "node:path";
 import type { BotClient } from "../types.js";
 import { CLI_TOOLS } from "../config.js";
@@ -7,6 +7,8 @@ import { getMultiSessionManager } from "../sessions/multiSession.js";
 import { checkPromptInjection } from "../utils/promptGuard.js";
 import { audit, AuditEvent } from "../utils/auditLog.js";
 import type { SlashCommand } from "./index.js";
+import type { PlatformMessage } from "../platform/types.js";
+import { getDiscordAdapter } from "../platform/discordAdapter.js";
 
 const data = new SlashCommandBuilder()
   .setName("ask")
@@ -67,9 +69,16 @@ async function execute(interaction: ChatInputCommandInteraction, client: BotClie
   await interaction.deferReply();
 
   try {
-    // Create a proxy object for the session manager (which expects a Message)
-    const proxyMessage = { channel: interaction.channel, author: { id: interaction.user.id } } as unknown as Message;
-    const result = await multiSession.sendMessage(sessionName, msg, proxyMessage);
+    const platformMsg: PlatformMessage = {
+      platform: "discord",
+      userId: interaction.user.id,
+      displayName: interaction.user.displayName ?? interaction.user.username,
+      channelId: interaction.channelId,
+      content: msg,
+      raw: interaction,
+    };
+    const adapter = getDiscordAdapter();
+    const result = await multiSession.sendMessage(sessionName, msg, platformMsg, adapter);
 
     const tool = CLI_TOOLS[namedSession.cliName];
     const folder = path.basename(client.workingDir);

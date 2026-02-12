@@ -1,4 +1,5 @@
-import { ALLOWED_USER_IDS, BLOCKED_COMMANDS } from "../config.js";
+import { ALLOWED_USER_IDS, ALLOWED_LINE_USER_IDS, BLOCKED_COMMANDS } from "../config.js";
+import type { PlatformType } from "../platform/types.js";
 
 /** Check if a Discord user is whitelisted. Empty whitelist = deny all. */
 export function isAllowedUser(userId: string): boolean {
@@ -7,6 +8,27 @@ export function isAllowedUser(userId: string): boolean {
     return false;
   }
   return ALLOWED_USER_IDS.has(userId);
+}
+
+/** Check if a LINE user is whitelisted. Empty whitelist = deny all. */
+export function isAllowedLineUser(userId: string): boolean {
+  if (ALLOWED_LINE_USER_IDS.size === 0) {
+    console.warn("[security] ALLOWED_LINE_USER_IDS is empty — all LINE access denied. Set user IDs in .env.");
+    return false;
+  }
+  return ALLOWED_LINE_USER_IDS.has(userId);
+}
+
+/** Check authorization based on platform type. */
+export function isAuthorizedOnPlatform(platform: PlatformType, userId: string): boolean {
+  switch (platform) {
+    case "discord":
+      return isAllowedUser(userId);
+    case "line":
+      return isAllowedLineUser(userId);
+    default:
+      return false;
+  }
 }
 
 /**

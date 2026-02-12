@@ -1,4 +1,5 @@
 import { Client, Collection, Message, TextBasedChannel } from "discord.js";
+import type { PlatformMessage, PlatformAdapter } from "./platform/types.js";
 
 // --- Command system (discord.py Cog 대응) ---
 
@@ -97,7 +98,12 @@ export interface PersistedSessionState {
 
 export interface ISessionManager {
   readonly isBusy: boolean;
-  sendMessage(message: string, discordMessage: Message, onProgress?: (status: string) => void): Promise<string>;
+  sendMessage(
+    message: string,
+    platformMessage: PlatformMessage,
+    adapter: PlatformAdapter,
+    onProgress?: (status: string) => void,
+  ): Promise<string>;
   kill(): Promise<boolean>;
   newSession(): Promise<void>;
   getInfo(): SessionInfo;

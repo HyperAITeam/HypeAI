@@ -1,14 +1,16 @@
-# AIDevelop — Discord AI CLI Gateway Bot
+# AIDevelop — Discord / LINE AI CLI Gateway Bot
 
-Discord 메시지를 통해 내 Windows PC에서 실행 중인 AI CLI 도구(Claude Code, Gemini CLI, OpenCode)에
+Discord 또는 LINE 메시지를 통해 내 Windows PC에서 실행 중인 AI CLI 도구(Claude Code, Gemini CLI, OpenCode)에
 명령을 전달하고 응답을 받아오는 봇입니다.
 
 ```
-[Discord 메시지] → [내 PC의 봇] → [AI CLI 도구에 전달] → [응답을 Discord로 반환]
+[Discord / LINE 메시지] → [내 PC의 봇] → [AI CLI 도구에 전달] → [응답을 Discord / LINE으로 반환]
 ```
 
-**Claude Code**는 Agent SDK를 통해 직접 통신하며, AI가 질문할 때 Discord 버튼/셀렉트 메뉴로 응답할 수 있습니다.
+**Claude Code**는 Agent SDK를 통해 직접 통신하며, AI가 질문할 때 Discord 버튼/셀렉트 메뉴 또는 LINE Quick Reply로 응답할 수 있습니다.
 **Gemini CLI / OpenCode**는 subprocess 방식으로 동작합니다.
+
+> Discord만, LINE만, 또는 둘 다 동시에 사용할 수 있습니다. `.env` 설정에 따라 자동으로 결정됩니다.
 
 ---
 
@@ -16,16 +18,17 @@ Discord 메시지를 통해 내 Windows PC에서 실행 중인 AI CLI 도구(Cla
 
 1. [사전 준비](#1-사전-준비)
 2. [Discord 봇 생성](#2-discord-봇-생성)
-3. [프로젝트 설치](#3-프로젝트-설치)
-4. [환경 설정 (.env)](#4-환경-설정-env)
-5. [봇 실행](#5-봇-실행)
-6. [명령어 사용법](#6-명령어-사용법)
-7. [세션 관리](#7-세션-관리)
-8. [TUI 대화형 응답 (Claude 전용)](#8-tui-대화형-응답-claude-전용)
-9. [프로젝트 구조](#9-프로젝트-구조)
-10. [동작 원리](#10-동작-원리)
-11. [보안](#11-보안)
-12. [FAQ / 문제 해결](#12-faq--문제-해결)
+3. [LINE 봇 생성 (선택)](#3-line-봇-생성-선택)
+4. [프로젝트 설치](#4-프로젝트-설치)
+5. [환경 설정 (.env)](#5-환경-설정-env)
+6. [봇 실행](#6-봇-실행)
+7. [명령어 사용법](#7-명령어-사용법)
+8. [세션 관리](#8-세션-관리)
+9. [TUI 대화형 응답 (Claude 전용)](#9-tui-대화형-응답-claude-전용)
+10. [프로젝트 구조](#10-프로젝트-구조)
+11. [동작 원리](#11-동작-원리)
+12. [보안](#12-보안)
+13. [FAQ / 문제 해결](#13-faq--문제-해결)
 
 ---
 
@@ -109,7 +112,155 @@ opencode --version
 
 ---
 
-## 3. 프로젝트 설치
+## 3. LINE 봇 생성 (선택)
+
+LINE에서도 AI를 제어하고 싶다면 이 섹션을 따라 설정하세요. Discord만 사용한다면 건너뛰어도 됩니다.
+
+### 3-1. LINE Official Account 생성
+
+1. [LINE Official Account Manager](https://manager.line.biz/) 접속 → LINE 계정으로 로그인
+2. **새 계정 만들기** 클릭
+3. 계정 정보 입력:
+   - **계정 이름**: 봇 이름 (예: `AIDevelop Bot`)
+   - **카테고리**: 아무거나 선택 (예: `IT서비스`)
+4. **생성** 클릭
+
+> LINE Developers Console에서 직접 Messaging API 채널을 만들 수 없게 변경되었습니다.
+> 반드시 Official Account를 먼저 만든 뒤 Messaging API를 활성화해야 합니다.
+
+### 3-2. Messaging API 활성화
+
+1. [LINE Official Account Manager](https://manager.line.biz/) → 생성한 계정 선택
+2. 왼쪽 메뉴 **설정** → **Messaging API** 탭
+3. **Messaging API 사용** 클릭
+4. **제공자(Provider)** 선택:
+   - 기존 제공자가 있으면 선택
+   - 없으면 **새 제공자 만들기** → 이름 입력 (예: 본인 이름)
+5. 동의 후 활성화 완료
+
+### 3-3. 채널 정보 확인 (LINE Developers Console)
+
+1. [LINE Developers Console](https://developers.line.biz/console/) 접속
+2. 제공자 선택 → Messaging API 채널 클릭
+
+#### Channel Secret 복사
+- **Basic settings** 탭 → `Channel secret` → 복사
+
+#### Channel Access Token 발급
+- **Messaging API** 탭 → 하단 `Channel access token (long-lived)` → **Issue** 클릭 → 복사
+
+#### 내 LINE User ID 확인
+- **Basic settings** 탭 → `Your user ID` → 복사 (U로 시작하는 33자 문자열)
+
+### 3-4. 응답 설정 변경
+
+[LINE Official Account Manager](https://manager.line.biz/) → 계정 선택:
+
+1. **설정** → **응답 설정** (또는 **Response settings**)
+2. 아래와 같이 변경:
+
+| 항목 | 설정 |
+|------|------|
+| **응답 메시지** (자동 응답) | **끄기** |
+| **Webhook** | **켜기** |
+
+> 자동 응답이 켜져 있으면 봇 대신 기본 자동 응답 메시지가 전송되므로 반드시 꺼야 합니다.
+
+### 3-5. 웹훅 URL 설정
+
+LINE 봇은 **웹훅** 방식으로 동작합니다. LINE 서버가 사용자 메시지를 봇 서버의 URL로 전달하므로,
+봇이 실행되는 PC가 외부에서 접근 가능해야 합니다.
+
+#### 방법 A: Cloudflare Tunnel (무료, 로컬 테스트/개인 사용 권장)
+
+별도 서버 없이 내 PC의 로컬 서버를 인터넷에 노출할 수 있습니다.
+
+```bash
+# 1. Cloudflare Tunnel 설치 (한 번만)
+winget install cloudflare.cloudflared
+
+# 2. 터널 실행 (봇과 별도 터미널에서)
+cloudflared tunnel --url http://localhost:3000
+```
+
+실행 후 아래와 같은 URL이 표시됩니다:
+```
++--------------------------------------------------------------------------------------------+
+|  Your quick Tunnel has been created! Visit it at (it may take some time to be reachable):  |
+|  https://some-random-words.trycloudflare.com                                               |
++--------------------------------------------------------------------------------------------+
+```
+
+이 URL을 복사해 LINE Developers Console에 등록합니다.
+
+> Cloudflare Tunnel의 무료 Quick Tunnel은 실행할 때마다 URL이 변경됩니다.
+> 봇을 재시작하면 LINE Developers Console에서 웹훅 URL도 업데이트해야 합니다.
+> 고정 URL이 필요하면 Cloudflare 계정으로 Named Tunnel을 사용하세요.
+
+#### 방법 B: 클라우드 서버 (운영 환경)
+
+고정 IP/도메인이 있는 서버(AWS, GCP, VPS 등)에서 봇을 실행하면 URL이 변경되지 않습니다.
+
+```
+https://your-domain.com/webhook
+```
+
+nginx 리버스 프록시 예시:
+```nginx
+server {
+    listen 443 ssl;
+    server_name your-domain.com;
+
+    location /webhook {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+    }
+}
+```
+
+### 3-6. LINE Developers Console에 웹훅 등록
+
+1. [LINE Developers Console](https://developers.line.biz/console/) → 채널 → **Messaging API** 탭
+2. **Webhook URL** 입력:
+   - Cloudflare Tunnel: `https://some-random-words.trycloudflare.com/webhook`
+   - 자체 서버: `https://your-domain.com/webhook`
+3. **Update** 클릭
+4. **Use webhook** → 켜기 (이미 켜져 있을 수 있음)
+5. **Verify** 클릭 → `Success` 확인
+
+> Verify는 봇이 실행 중일 때만 성공합니다. 봇을 먼저 실행한 후 Verify하세요.
+
+### 3-7. 테스트
+
+봇 실행 후 LINE에서 봇 계정에 메시지를 보내 테스트합니다:
+
+```
+!ask 안녕하세요
+!status
+!help
+```
+
+콘솔에 `[LINE] Message from User: ...` 로그가 보이면 정상 동작입니다.
+
+### LINE 봇 구동 방식 정리
+
+```
+[LINE 사용자] → [LINE 서버] → [웹훅 POST] → [봇 (localhost:3000)]
+                                                       │
+                                              [AI CLI 도구 실행]
+                                                       │
+                                              [pushMessage API]
+                                                       │
+                                              [LINE 서버] → [LINE 사용자]
+```
+
+- 사용자 메시지 수신: LINE 서버 → 웹훅 → 봇
+- 봇 응답 전송: 봇 → LINE Push Message API → 사용자
+- AI 처리 시간이 길어도 결과가 도착하면 자동으로 전송됩니다
+
+---
+
+## 4. 프로젝트 설치
 
 ### 방법 A: setup.bat 사용 (간편)
 
@@ -137,29 +288,52 @@ notepad .env
 
 ---
 
-## 4. 환경 설정 (.env)
+## 5. 환경 설정 (.env)
 
 `.env` 파일을 열어 아래 값들을 설정합니다:
 
 ```ini
-# [필수] Discord 봇 토큰 (2단계에서 복사한 값)
+# ============================================================
+# Discord 설정 (Discord 사용 시 필수)
+# ============================================================
+
+# Discord 봇 토큰 (2단계에서 복사한 값)
 DISCORD_BOT_TOKEN=여기에_봇_토큰_붙여넣기
 
-# [필수] 허가된 Discord 유저 ID (17-19자리 숫자, 여러 명이면 쉼표로 구분)
+# 허가된 Discord 유저 ID (17-19자리 숫자, 여러 명이면 쉼표로 구분)
 # ⚠️ 반드시 숫자 ID를 사용하세요! (유저네임 ❌)
-# ⚠️ ID는 외부에 절대 노출하지 마세요!
 ALLOWED_USER_IDS=123456789012345678
 
-# [선택] Anthropic API 키 (claude login 사용 시 불필요)
+# ============================================================
+# LINE 설정 (LINE 사용 시 필수 — 생략하면 Discord만 실행)
+# ============================================================
+
+# LINE 채널 액세스 토큰 (3단계에서 복사한 값)
+# LINE_CHANNEL_ACCESS_TOKEN=
+
+# LINE 채널 시크릿 (3단계에서 복사한 값)
+# LINE_CHANNEL_SECRET=
+
+# LINE 웹훅 서버 포트 (기본: 3000)
+# LINE_WEBHOOK_PORT=3000
+
+# 허가된 LINE 유저 ID (U로 시작하는 문자열, 쉼표 구분)
+# ALLOWED_LINE_USER_IDS=
+
+# ============================================================
+# 공통 설정 (선택)
+# ============================================================
+
+# Anthropic API 키 (claude login 사용 시 불필요)
 # ANTHROPIC_API_KEY=sk-ant-xxxxx
 
-# [선택] 명령어 접두사 (기본: !)
+# 명령어 접두사 (기본: !)
 COMMAND_PREFIX=!
 
-# [선택] CMD 명령 타임아웃 - 초 (기본: 30)
+# CMD 명령 타임아웃 - 초 (기본: 30)
 COMMAND_TIMEOUT=30
 
-# [선택] AI CLI 타임아웃 - 초 (기본: 300 = 5분)
+# AI CLI 타임아웃 - 초 (기본: 300 = 5분)
 AI_CLI_TIMEOUT=300
 ```
 
@@ -167,19 +341,35 @@ AI_CLI_TIMEOUT=300
 
 | 변수 | 필수 | 기본값 | 설명 |
 |------|:----:|--------|------|
-| `DISCORD_BOT_TOKEN` | O | — | Discord 봇 토큰 |
-| `ALLOWED_USER_IDS` | O | — | 봇 사용 허가 유저 ID (17-19자리 숫자, 쉼표 구분) |
+| `DISCORD_BOT_TOKEN` | ⚡ | — | Discord 봇 토큰 (Discord 사용 시) |
+| `ALLOWED_USER_IDS` | ⚡ | — | Discord 유저 ID (17-19자리 숫자, 쉼표 구분) |
+| `LINE_CHANNEL_ACCESS_TOKEN` | ⚡ | — | LINE 채널 액세스 토큰 (LINE 사용 시) |
+| `LINE_CHANNEL_SECRET` | ⚡ | — | LINE 채널 시크릿 (LINE 사용 시) |
+| `LINE_WEBHOOK_PORT` | | `3000` | LINE 웹훅 서버 포트 |
+| `ALLOWED_LINE_USER_IDS` | ⚡ | — | LINE 유저 ID (U로 시작, 쉼표 구분) |
 | `ANTHROPIC_API_KEY` | | — | Anthropic API 키 (`claude login` 사용 시 불필요) |
 | `COMMAND_PREFIX` | | `!` | 명령어 접두사 |
 | `COMMAND_TIMEOUT` | | `30` | `!exec` 명령 타임아웃 (초) |
 | `AI_CLI_TIMEOUT` | | `300` | AI CLI 응답 타임아웃 (초) |
+
+> ⚡ = 해당 플랫폼 사용 시 필수. Discord만 사용하면 LINE 설정 불필요, LINE만 사용하면 Discord 설정 불필요.
+
+### 플랫폼 구동 모드
+
+`.env` 설정에 따라 봇이 자동으로 구동 모드를 결정합니다:
+
+| Discord 설정 | LINE 설정 | 구동 모드 |
+|:---:|:---:|:---|
+| O | X | Discord만 실행 |
+| X | O | LINE만 실행 |
+| O | O | Discord + LINE 동시 실행 |
 
 > ⚠️ **보안 주의**: Discord ID는 17-19자리 **숫자**만 사용해야 합니다 (유저네임 ❌).
 > ID가 외부에 노출되면 스팸, 피싱 등의 타겟이 될 수 있으니 **절대 공개하지 마세요!**
 
 ---
 
-## 5. 봇 실행
+## 6. 봇 실행
 
 ### 방법 A: exe 파일 실행 (권장)
 
@@ -267,7 +457,7 @@ npx tsx src/bot.ts
 
 ---
 
-## 6. 명령어 사용법
+## 7. 명령어 사용법
 
 ### 전체 명령어 목록
 
@@ -317,7 +507,7 @@ npx tsx src/bot.ts
 
 ---
 
-## 7. 세션 관리
+## 8. 세션 관리
 
 AI와의 대화는 **세션** 단위로 관리됩니다.
 
@@ -353,10 +543,10 @@ AI와의 대화는 **세션** 단위로 관리됩니다.
 
 ---
 
-## 8. TUI 대화형 응답 (Claude 전용)
+## 9. TUI 대화형 응답 (Claude 전용)
 
 Claude Code를 사용할 때, AI가 사용자에게 질문을 하면 (예: "어떤 방식으로 할까요?")
-Discord에서 **버튼** 또는 **셀렉트 메뉴**로 선택지가 표시됩니다.
+Discord에서는 **버튼** 또는 **셀렉트 메뉴**로, LINE에서는 **Quick Reply**로 선택지가 표시됩니다.
 
 ### 동작 흐름
 
@@ -383,16 +573,23 @@ Discord에서 **버튼** 또는 **셀렉트 메뉴**로 선택지가 표시됩�
    최종 결과를 Discord에 전송
 ```
 
+**Discord:**
 - 선택지가 **4개 이하**: 버튼으로 표시
 - 선택지가 **5개 이상**: 셀렉트 메뉴(드롭다운)로 표시
-- **60초 타임아웃**: 시간 내에 선택하지 않으면 첫 번째 옵션이 자동 선택됩니다
 - 선택 후 버튼이 비활성화되고 어떤 옵션을 선택했는지 표시됩니다
+
+**LINE:**
+- **Quick Reply** 버튼으로 표시 (최대 13개)
+- 선택지를 탭하면 해당 텍스트가 자동 전송됩니다
+
+**공통:**
+- **60초 타임아웃**: 시간 내에 선택하지 않으면 첫 번째 옵션이 자동 선택됩니다
 
 > Gemini CLI / OpenCode는 이 기능을 지원하지 않습니다 (subprocess 방식).
 
 ---
 
-## 9. 프로젝트 구조
+## 10. 프로젝트 구조
 
 ```
 C:\Osgood\AIDevelop\
@@ -405,33 +602,51 @@ C:\Osgood\AIDevelop\
 ├── .gitignore
 │
 └── src/
-    ├── bot.ts                # 엔트리포인트 (봇 시작, CLI/폴더 선택, 커맨드 디스패치)
-    ├── config.ts             # 설정 (.env 로딩, CLI 도구 정의)
+    ├── bot.ts                # 엔트리포인트 (Discord/LINE 조건부 시작)
+    ├── config.ts             # 설정 (.env 로딩, CLI/LINE 도구 정의)
     ├── types.ts              # 타입 정의 (PrefixCommand, BotClient, ISessionManager)
+    ├── lineBot.ts            # LINE 웹훅 서버 (HTTP + 커맨드 라우팅)
     │
-    ├── commands/             # Discord 명령어 모듈
-    │   ├── ask.ts            # !ask — AI CLI에 메시지 전달
-    │   ├── session.ts        # !session — 세션 관리 (info/new/kill)
-    │   ├── exec.ts           # !exec — CMD 명령 실행
-    │   ├── status.ts         # !status — 시스템 정보
-    │   └── help.ts           # !help — 도움말
+    ├── platform/             # 플랫폼 추상화 레이어
+    │   ├── types.ts          # PlatformAdapter, PlatformMessage 등 인터페이스
+    │   ├── context.ts        # CrossPlatformContext
+    │   ├── discordAdapter.ts # Discord 어댑터 (버튼, Embed, 타이핑 등)
+    │   ├── lineAdapter.ts    # LINE 어댑터 (Flex Message, Quick Reply 등)
+    │   └── index.ts          # 재export
+    │
+    ├── commands/             # Discord 명령어 모듈 (thin wrapper)
+    │   ├── ask.ts            # !ask → askCross.ts 위임
+    │   ├── session.ts        # !session → sessionCross.ts 위임
+    │   ├── exec.ts           # !exec → execCross.ts 위임
+    │   ├── status.ts         # !status → statusCross.ts 위임
+    │   ├── help.ts           # !help → helpCross.ts 위임
+    │   ├── task.ts           # !task — 작업 큐 관리
+    │   ├── myid.ts           # !myid — Discord ID 확인
+    │   ├── diff.ts           # !diff — Git diff 시각화
+    │   └── cross/            # 크로스 플랫폼 커맨드 (비즈니스 로직)
+    │       ├── askCross.ts   # AI 질의 (플랫폼 무관)
+    │       ├── sessionCross.ts # 세션 관리 (플랫폼 무관)
+    │       ├── execCross.ts  # 셸 실행 (플랫폼 무관)
+    │       ├── statusCross.ts # 시스템 정보 (플랫폼 무관)
+    │       └── helpCross.ts  # 도움말 (플랫폼 무관)
     │
     ├── sessions/             # AI CLI 세션 관리
-    │   ├── types.ts          # ISessionManager 인터페이스
     │   ├── claude.ts         # Claude Agent SDK 세션 (TUI 대응)
-    │   └── subprocess.ts     # Gemini/OpenCode subprocess 세션
+    │   ├── gemini.ts         # Gemini CLI 세션 (stream JSON)
+    │   ├── subprocess.ts     # OpenCode subprocess 세션
+    │   └── multiSession.ts   # 멀티세션 매니저
     │
     └── utils/                # 유틸리티
         ├── discordPrompt.ts  # AskUserQuestion → Discord 버튼/셀렉트 메뉴
         ├── formatter.ts      # Discord 출력 포맷 (2000자 제한 처리)
-        ├── security.ts       # 유저 화이트리스트, 명령어 블랙리스트
+        ├── security.ts       # 유저 화이트리스트 (Discord + LINE)
         ├── subprocess.ts     # 비동기 subprocess 래퍼 (!exec 용)
         └── typing.ts         # 타이핑 인디케이터 헬퍼
 ```
 
 ---
 
-## 10. 동작 원리
+## 11. 동작 원리
 
 ### Claude Code 흐름 (Agent SDK)
 
@@ -502,7 +717,7 @@ C:\Osgood\AIDevelop\
 |---|---|---|---|
 | **통신** | Agent SDK (`query()`) | subprocess | subprocess |
 | **세션 재개** | O (`resume`) | X | X |
-| **TUI 질문 대응** | O (Discord 버튼) | X | X |
+| **TUI 질문 대응** | O (Discord 버튼 / LINE Quick Reply) | X | X |
 | **권한 자동 승인** | `bypassPermissions` | `--yolo` 플래그 | — |
 | **출력 형식** | SDK 메시지 스트림 | plain text | plain text |
 
@@ -518,13 +733,14 @@ C:\Osgood\AIDevelop\
 
 ---
 
-## 11. 보안
+## 12. 보안
 
 ### 3단계 보안 구조
 
 ```
-[1층] Discord 유저 화이트리스트
-       └─ ALLOWED_USER_IDS에 등록된 사용자만 명령 가능
+[1층] 플랫폼별 유저 화이트리스트
+       ├─ Discord: ALLOWED_USER_IDS에 등록된 사용자만 명령 가능
+       └─ LINE: ALLOWED_LINE_USER_IDS에 등록된 사용자만 명령 가능 + 웹훅 서명 검증
 
 [2층] 명령어 블랙리스트 (!exec 전용)
        └─ format, diskpart, shutdown 등 위험 명령 차단
@@ -554,7 +770,7 @@ net user, net localgroup
 
 ---
 
-## 12. FAQ / 문제 해결
+## 13. FAQ / 문제 해결
 
 ### Q: exe 실행 시 "cli.js 파일을 찾을 수 없습니다" 에러
 - `cli.js` 파일이 exe와 **같은 폴더**에 있어야 합니다
@@ -630,6 +846,41 @@ net user, net localgroup
 ### Q: 여러 사용자가 동시에 사용할 수 있나요?
 - 현재 1개의 세션만 지원합니다 (모든 유저가 같은 대화를 공유)
 - 여러 유저의 메시지가 같은 AI 대화에 섞일 수 있습니다
+
+### Q: LINE 봇이 메시지에 반응하지 않아요
+- `.env`에 `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_CHANNEL_SECRET`이 올바른지 확인
+- `ALLOWED_LINE_USER_IDS`에 본인 LINE 유저 ID가 등록되어 있는지 확인
+- LINE Official Account Manager에서 **응답 메시지(자동 응답)가 꺼져 있는지** 확인
+- LINE Official Account Manager에서 **Webhook이 켜져 있는지** 확인
+- 봇 콘솔에 `[LINE] Webhook server listening on port 3000` 메시지가 있는지 확인
+
+### Q: LINE 웹훅 Verify가 실패해요
+- 봇이 실행 중인지 확인 (`npx tsx src/bot.ts`)
+- Cloudflare Tunnel을 사용하는 경우 터널도 실행 중인지 확인
+- 웹훅 URL이 `/webhook`으로 끝나는지 확인 (예: `https://xxx.trycloudflare.com/webhook`)
+- `LINE_WEBHOOK_PORT`와 Cloudflare Tunnel의 포트가 일치하는지 확인
+
+### Q: LINE에서 AI 응답이 너무 늦게 와요
+- LINE은 웹훅 방식이라 즉시 "처리 중..." 메시지를 보내고, AI 결과는 나중에 Push Message로 전송합니다
+- AI 처리 시간 자체를 줄이려면 `AI_CLI_TIMEOUT` 설정을 확인하세요
+
+### Q: LINE에서 이미지나 파일을 받을 수 있나요?
+- 긴 텍스트 결과는 자동으로 여러 메시지로 분할되어 전송됩니다
+- LINE은 Discord와 달리 파일 첨부가 제한적이므로, 긴 결과는 텍스트로 전송됩니다
+
+### Q: Discord와 LINE을 동시에 사용할 수 있나요?
+- 네. `.env`에 Discord 설정과 LINE 설정을 모두 입력하면 동시에 실행됩니다
+- 콘솔에 `[platform] Active: Discord + LINE`으로 표시됩니다
+- 세션은 플랫폼 간 공유됩니다 (같은 AI 세션에 Discord와 LINE에서 메시지를 보낼 수 있음)
+
+### Q: Cloudflare Tunnel URL이 매번 바뀌어요
+- 무료 Quick Tunnel은 실행할 때마다 URL이 변경됩니다
+- 고정 URL이 필요하면 Cloudflare 계정을 만들고 Named Tunnel을 사용하세요
+- 또는 고정 IP가 있는 서버에서 봇을 실행하세요
+
+### Q: exe 배포 시 LINE도 바로 사용할 수 있나요?
+- 네. exe 사용자도 `.env`에 LINE 설정만 추가하면 LINE 봇이 활성화됩니다
+- LINE 웹훅 URL 설정과 Cloudflare Tunnel (또는 서버)은 별도로 필요합니다
 
 ---
 

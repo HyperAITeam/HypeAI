@@ -13,7 +13,9 @@ import {
   AUDIT_LOG_DIR, AUDIT_LOG_ENABLED,
   RATE_LIMIT_MAX, RATE_LIMIT_WINDOW,
   APPLICATION_ID, SLASH_COMMAND_GUILD_ID,
+  LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_SECRET,
 } from "./config.js";
+import { LineBotServer } from "./lineBot.js";
 import type { BotClient, PrefixCommand, CommandContext } from "./types.js";
 import type { ISessionManager } from "./sessions/types.js";
 import { ClaudeSessionManager } from "./sessions/claude.js";
@@ -288,33 +290,22 @@ export function createSession(cliName: string, cwd: string): ISessionManager {
 async function main(): Promise<void> {
   await setupEnv();
 
-  if (!DISCORD_BOT_TOKEN) {
-    console.error("DISCORD_BOT_TOKEN is not set. Check your .env file.");
+  const hasDiscord = !!DISCORD_BOT_TOKEN;
+  const hasLine = !!(LINE_CHANNEL_ACCESS_TOKEN && LINE_CHANNEL_SECRET);
+
+  if (!hasDiscord && !hasLine) {
+    console.error("No platform configured. Set DISCORD_BOT_TOKEN and/or LINE_CHANNEL_ACCESS_TOKEN + LINE_CHANNEL_SECRET in .env.");
     process.exit(1);
   }
 
-  if (ALLOWED_USER_IDS.size === 0) {
+  if (hasDiscord && ALLOWED_USER_IDS.size === 0) {
     console.warn();
     console.warn("  [WARNING] ALLOWED_USER_IDS is empty!");
-    console.warn("  All commands will be denied until user IDs are configured in .env.");
+    console.warn("  All Discord commands will be denied until user IDs are configured in .env.");
     console.warn();
   }
 
   const { cliName, workingDir } = await startupSetup();
-
-  const client = new Client({
-    intents: [
-      GatewayIntentBits.Guilds,
-      GatewayIntentBits.GuildMessages,
-      GatewayIntentBits.MessageContent,
-    ],
-  }) as BotClient;
-
-  client.commands = new Collection();
-  client.aliases = new Collection();
-  client.slashCommands = buildSlashCollection();
-  client.selectedCli = cliName;
-  client.workingDir = workingDir;
 
   // Initialize audit logger
   if (AUDIT_LOG_ENABLED) {
@@ -340,131 +331,152 @@ async function main(): Promise<void> {
     console.log(`  [persist] Restored ${restored} session(s) from disk`);
   }
 
-  // Load commands
-  loadCommands(client);
+  // ── Discord setup (conditional) ──
+  let client: BotClient | null = null;
+  let lineBot: LineBotServer | null = null;
 
-  // ── Events ──
+  if (hasDiscord) {
+    client = new Client({
+      intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+      ],
+    }) as BotClient;
 
-  client.on(Events.ClientReady, async () => {
-    const tool = CLI_TOOLS[cliName];
-    const folder = path.basename(workingDir);
-    console.log(`  Logged in as ${client.user?.tag}`);
-    console.log(`  Active CLI: ${tool.name}  |  CWD: ${workingDir}`);
-    client.user?.setActivity(`${tool.name} @ ${folder}`, {
-      type: ActivityType.Listening,
+    client.commands = new Collection();
+    client.aliases = new Collection();
+    client.slashCommands = buildSlashCollection();
+    client.selectedCli = cliName;
+    client.workingDir = workingDir;
+
+    // Load commands
+    loadCommands(client);
+
+    // ── Discord Events ──
+
+    client.on(Events.ClientReady, async () => {
+      const tool = CLI_TOOLS[cliName];
+      const folder = path.basename(workingDir);
+      console.log(`  [Discord] Logged in as ${client!.user?.tag}`);
+      console.log(`  [Discord] Active CLI: ${tool.name}  |  CWD: ${workingDir}`);
+      client!.user?.setActivity(`${tool.name} @ ${folder}`, {
+        type: ActivityType.Listening,
+      });
+
+      // Register slash commands if APPLICATION_ID is set
+      if (APPLICATION_ID) {
+        try {
+          await registerSlashCommands(
+            APPLICATION_ID,
+            DISCORD_BOT_TOKEN,
+            SLASH_COMMAND_GUILD_ID || undefined,
+          );
+        } catch (err: any) {
+          console.error(`  [slash] Failed to register: ${err.message}`);
+        }
+      }
     });
 
-    // Register slash commands if APPLICATION_ID is set
-    if (APPLICATION_ID) {
-      try {
-        await registerSlashCommands(
-          APPLICATION_ID,
-          DISCORD_BOT_TOKEN,
-          SLASH_COMMAND_GUILD_ID || undefined,
-        );
-      } catch (err: any) {
-        console.error(`  [slash] Failed to register: ${err.message}`);
+    client.on(Events.MessageCreate, async (message) => {
+      if (message.author.bot) return;
+      if (!message.content.startsWith(COMMAND_PREFIX)) return;
+
+      const args = message.content.slice(COMMAND_PREFIX.length).trim().split(/\s+/);
+      const cmdName = args.shift()?.toLowerCase();
+      if (!cmdName) return;
+
+      const cmd =
+        client!.commands.get(cmdName) ??
+        client!.commands.get(client!.aliases.get(cmdName) ?? "");
+      if (!cmd) return;
+
+      // Rate limiting
+      const rateLimiter = getRateLimiter();
+      if (rateLimiter) {
+        const { allowed, retryAfterMs } = rateLimiter.tryConsume(message.author.id);
+        if (!allowed) {
+          const secs = Math.ceil(retryAfterMs / 1000);
+          audit(AuditEvent.RATE_LIMITED, message.author.id, {
+            command: cmdName,
+            success: false,
+          });
+          await message.reply(`Rate limited. Try again in ${secs}s.`).catch(() => {});
+          return;
+        }
       }
-    }
-  });
 
-  client.on(Events.MessageCreate, async (message) => {
-    if (message.author.bot) return;
-    if (!message.content.startsWith(COMMAND_PREFIX)) return;
+      // Audit: command executed
+      audit(AuditEvent.COMMAND_EXECUTED, message.author.id, { command: cmdName });
 
-    const args = message.content.slice(COMMAND_PREFIX.length).trim().split(/\s+/);
-    const cmdName = args.shift()?.toLowerCase();
-    if (!cmdName) return;
+      const ctx: CommandContext = { message, args, client: client! };
 
-    const cmd =
-      client.commands.get(cmdName) ??
-      client.commands.get(client.aliases.get(cmdName) ?? "");
-    if (!cmd) return;
-
-    // Rate limiting
-    const rateLimiter = getRateLimiter();
-    if (rateLimiter) {
-      const { allowed, retryAfterMs } = rateLimiter.tryConsume(message.author.id);
-      if (!allowed) {
-        const secs = Math.ceil(retryAfterMs / 1000);
-        audit(AuditEvent.RATE_LIMITED, message.author.id, {
+      try {
+        await cmd.execute(ctx);
+      } catch (err: any) {
+        console.error(`[error] Command ${cmdName}:`, err);
+        audit(AuditEvent.COMMAND_ERROR, message.author.id, {
           command: cmdName,
           success: false,
+          details: { error: String(err.message ?? err) },
         });
-        await message.reply(`Rate limited. Try again in ${secs}s.`).catch(() => {});
-        return;
+        const safeMsg = sanitizeOutput(String(err.message ?? err));
+        await message.reply(`An error occurred: \`${safeMsg}\``).catch(() => {});
       }
-    }
-
-    // Audit: command executed
-    audit(AuditEvent.COMMAND_EXECUTED, message.author.id, { command: cmdName });
-
-    const ctx: CommandContext = { message, args, client };
-
-    try {
-      await cmd.execute(ctx);
-    } catch (err: any) {
-      console.error(`[error] Command ${cmdName}:`, err);
-      audit(AuditEvent.COMMAND_ERROR, message.author.id, {
-        command: cmdName,
-        success: false,
-        details: { error: String(err.message ?? err) },
-      });
-      const safeMsg = sanitizeOutput(String(err.message ?? err));
-      await message.reply(`An error occurred: \`${safeMsg}\``).catch(() => {});
-    }
-  });
-
-  // ── Slash command handler ──
-  client.on(Events.InteractionCreate, async (interaction) => {
-    if (!interaction.isChatInputCommand()) return;
-
-    const slashCmd = client.slashCommands.get(interaction.commandName) as SlashCommand | undefined;
-    if (!slashCmd) return;
-
-    // Rate limiting for slash commands
-    const rateLimiter = getRateLimiter();
-    if (rateLimiter) {
-      const { allowed, retryAfterMs } = rateLimiter.tryConsume(interaction.user.id);
-      if (!allowed) {
-        const secs = Math.ceil(retryAfterMs / 1000);
-        audit(AuditEvent.RATE_LIMITED, interaction.user.id, {
-          command: interaction.commandName,
-          success: false,
-        });
-        await interaction.reply({
-          content: `Rate limited. Try again in ${secs}s.`,
-          ephemeral: true,
-        }).catch(() => {});
-        return;
-      }
-    }
-
-    audit(AuditEvent.COMMAND_EXECUTED, interaction.user.id, {
-      command: `/${interaction.commandName}`,
     });
 
-    try {
-      await slashCmd.execute(interaction, client);
-    } catch (err: any) {
-      console.error(`[error] Slash /${interaction.commandName}:`, err);
-      audit(AuditEvent.COMMAND_ERROR, interaction.user.id, {
-        command: `/${interaction.commandName}`,
-        success: false,
-        details: { error: String(err.message ?? err) },
-      });
-      const content = `An error occurred: \`${String(err.message ?? err).slice(0, 100)}\``;
-      if (interaction.replied || interaction.deferred) {
-        await interaction.editReply(content).catch(() => {});
-      } else {
-        await interaction.reply({ content, ephemeral: true }).catch(() => {});
+    // ── Slash command handler ──
+    client.on(Events.InteractionCreate, async (interaction) => {
+      if (!interaction.isChatInputCommand()) return;
+
+      const slashCmd = client!.slashCommands.get(interaction.commandName) as SlashCommand | undefined;
+      if (!slashCmd) return;
+
+      // Rate limiting for slash commands
+      const rateLimiter = getRateLimiter();
+      if (rateLimiter) {
+        const { allowed, retryAfterMs } = rateLimiter.tryConsume(interaction.user.id);
+        if (!allowed) {
+          const secs = Math.ceil(retryAfterMs / 1000);
+          audit(AuditEvent.RATE_LIMITED, interaction.user.id, {
+            command: interaction.commandName,
+            success: false,
+          });
+          await interaction.reply({
+            content: `Rate limited. Try again in ${secs}s.`,
+            ephemeral: true,
+          }).catch(() => {});
+          return;
+        }
       }
-    }
-  });
+
+      audit(AuditEvent.COMMAND_EXECUTED, interaction.user.id, {
+        command: `/${interaction.commandName}`,
+      });
+
+      try {
+        await slashCmd.execute(interaction, client!);
+      } catch (err: any) {
+        console.error(`[error] Slash /${interaction.commandName}:`, err);
+        audit(AuditEvent.COMMAND_ERROR, interaction.user.id, {
+          command: `/${interaction.commandName}`,
+          success: false,
+          details: { error: String(err.message ?? err) },
+        });
+        const content = `An error occurred: \`${String(err.message ?? err).slice(0, 100)}\``;
+        if (interaction.replied || interaction.deferred) {
+          await interaction.editReply(content).catch(() => {});
+        } else {
+          await interaction.reply({ content, ephemeral: true }).catch(() => {});
+        }
+      }
+    });
+  }
 
   // Graceful shutdown - cleanup all sessions
   const shutdown = async () => {
     console.log("\n  Shutting down...");
+    if (lineBot) lineBot.stop();
     const multiSessionMgr = getMultiSessionManager();
     if (multiSessionMgr) {
       multiSessionMgr.persistToDisk();
@@ -473,22 +485,41 @@ async function main(): Promise<void> {
     const logger = getAuditLogger();
     if (logger) await logger.shutdown();
     await closeBrowser(); // Close puppeteer browser
-    client.destroy();
+    if (client) client.destroy();
     process.exit(0);
   };
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
 
   // Pre-initialize Puppeteer (Chromium download) — non-blocking
-  try {
-    await initializePuppeteer();
-    console.log("  [puppeteer] Chromium ready");
-  } catch (err: any) {
-    console.warn(`  [puppeteer] Chromium init failed: ${err.message}`);
-    console.warn("  [puppeteer] !diff will fall back to text mode");
+  if (hasDiscord) {
+    try {
+      await initializePuppeteer();
+      console.log("  [puppeteer] Chromium ready");
+    } catch (err: any) {
+      console.warn(`  [puppeteer] Chromium init failed: ${err.message}`);
+      console.warn("  [puppeteer] !diff will fall back to text mode");
+    }
   }
 
-  await client.login(DISCORD_BOT_TOKEN);
+  // ── Start platforms ──
+
+  // Start LINE webhook server if configured
+  if (hasLine) {
+    lineBot = new LineBotServer(cliName, workingDir);
+    await lineBot.start();
+  }
+
+  // Start Discord if configured
+  if (hasDiscord && client) {
+    await client.login(DISCORD_BOT_TOKEN);
+  }
+
+  // Log platform status
+  const platforms: string[] = [];
+  if (hasDiscord) platforms.push("Discord");
+  if (hasLine) platforms.push("LINE");
+  console.log(`  [platform] Active: ${platforms.join(" + ")}`);
 }
 
 main().catch((err) => {

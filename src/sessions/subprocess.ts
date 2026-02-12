@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import type { Message } from "discord.js";
 import type { ISessionManager, SessionInfo, SessionStats, HistoryEntry } from "./types.js";
 import type { CliTool } from "../types.js";
+import type { PlatformMessage, PlatformAdapter } from "../platform/types.js";
 import { buildSafeShellCmd } from "../utils/shellEscape.js";
 import { sanitizeOutput } from "../utils/sanitizeOutput.js";
 import { withRetry } from "../utils/retry.js";
@@ -53,7 +53,11 @@ export class SubprocessSessionManager implements ISessionManager {
     return this.proc !== null && this.proc.exitCode === null;
   }
 
-  async sendMessage(message: string, _discordMessage: Message): Promise<string> {
+  async sendMessage(
+    message: string,
+    platformMessage: PlatformMessage,
+    adapter: PlatformAdapter,
+  ): Promise<string> {
     this.lastMessage = message;
 
     try {
@@ -66,15 +70,14 @@ export class SubprocessSessionManager implements ISessionManager {
           backoffMultiplier: 2,
         },
         async (attempt, error, delayMs) => {
-          audit(AuditEvent.RETRY_ATTEMPTED, _discordMessage.author.id, {
+          audit(AuditEvent.RETRY_ATTEMPTED, platformMessage.userId, {
             details: { attempt, error: error.message, delayMs },
           });
           const secs = Math.ceil(delayMs / 1000);
-          if ("send" in _discordMessage.channel) {
-            await _discordMessage.channel.send(
-              `Retry ${attempt}/${RETRY_MAX_ATTEMPTS} in ${secs}s... (${error.message})`,
-            ).catch(() => {});
-          }
+          await adapter.reply(
+            platformMessage,
+            `Retry ${attempt}/${RETRY_MAX_ATTEMPTS} in ${secs}s... (${error.message})`,
+          ).catch(() => {});
         },
       );
 
