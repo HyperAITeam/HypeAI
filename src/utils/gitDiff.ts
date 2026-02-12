@@ -119,6 +119,52 @@ export async function getGitDiff(cwd: string, options: DiffOptions = {}): Promis
   // Parse file statistics
   const files = parseStatOutput(statOutput);
 
+  // Include untracked files (only for default diff — no --staged, no commit, no specific file)
+  if (!options.staged && !options.commit && !options.file) {
+    try {
+      const untrackedOutput = await execGit(
+        ["ls-files", "--others", "--exclude-standard"],
+        cwd,
+      );
+      const untrackedFiles = untrackedOutput.split("\n").filter(Boolean);
+
+      for (const filePath of untrackedFiles) {
+        // Generate diff for untracked file
+        let fileDiff = "";
+        try {
+          fileDiff = await execGit(
+            ["diff", "--no-index", "--", "/dev/null", filePath],
+            cwd,
+          );
+        } catch (err: any) {
+          // git diff --no-index exits with code 1 when there are differences (expected)
+          if (err.message && !err.message.includes("exited with code")) {
+            continue;
+          }
+          // The diff content is in the error message or we need to capture stdout
+          // Actually, execGit rejects on non-zero exit, but the stdout is lost.
+          // Use a different approach: read the file and build diff manually.
+          fileDiff = await buildUntrackedFileDiff(filePath, cwd);
+        }
+
+        if (fileDiff) {
+          raw += (raw ? "\n" : "") + fileDiff;
+
+          // Count lines for stats
+          const lineCount = fileDiff.split("\n").filter((l) => l.startsWith("+") && !l.startsWith("+++")).length;
+          files.push({
+            path: filePath,
+            status: "added",
+            additions: lineCount,
+            deletions: 0,
+          });
+        }
+      }
+    } catch {
+      // Silently ignore untracked file errors
+    }
+  }
+
   // Calculate totals
   const totalAdded = files.reduce((sum, f) => sum + f.additions, 0);
   const totalRemoved = files.reduce((sum, f) => sum + f.deletions, 0);
@@ -130,6 +176,31 @@ export async function getGitDiff(cwd: string, options: DiffOptions = {}): Promis
     raw,
     isGitRepo: true,
   };
+}
+
+/**
+ * Build a unified diff string for an untracked (new) file
+ */
+async function buildUntrackedFileDiff(filePath: string, cwd: string): Promise<string> {
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const fullPath = path.join(cwd, filePath);
+
+  try {
+    const stat = await fs.stat(fullPath);
+    // Skip binary / very large files
+    if (stat.size > 100_000) {
+      return `diff --git a/${filePath} b/${filePath}\nnew file mode 100644\n--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1 @@\n+[File too large to display (${Math.round(stat.size / 1024)}KB)]`;
+    }
+
+    const content = await fs.readFile(fullPath, "utf-8");
+    const lines = content.split("\n");
+    const plusLines = lines.map((l) => `+${l}`).join("\n");
+
+    return `diff --git a/${filePath} b/${filePath}\nnew file mode 100644\n--- /dev/null\n+++ b/${filePath}\n@@ -0,0 +1,${lines.length} @@\n${plusLines}`;
+  } catch {
+    return "";
+  }
 }
 
 /**
