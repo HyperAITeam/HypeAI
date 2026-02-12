@@ -257,3 +257,80 @@ export function filterSensitiveDiff(raw: string): string {
 
   return filtered.join("\n");
 }
+
+/**
+ * Split raw diff into pages that fit within Discord's message limit.
+ * Tries to split on file boundaries first, then on hunk boundaries.
+ * @param rawDiff - The raw diff string
+ * @param maxCharsPerPage - Maximum characters per page (default 1800, leaving room for code block markers)
+ */
+export function splitDiffIntoPages(rawDiff: string, maxCharsPerPage: number = 1800): string[] {
+  if (rawDiff.length <= maxCharsPerPage) {
+    return [rawDiff];
+  }
+
+  const pages: string[] = [];
+  // Split on file boundaries first
+  const fileSections = rawDiff.split(/(?=^diff --git )/m);
+
+  let currentPage = "";
+
+  for (const section of fileSections) {
+    if (!section.trim()) continue;
+
+    if (currentPage.length + section.length <= maxCharsPerPage) {
+      currentPage += section;
+    } else {
+      // Current section doesn't fit in current page
+      if (currentPage.trim()) {
+        pages.push(currentPage.trim());
+      }
+
+      if (section.length <= maxCharsPerPage) {
+        currentPage = section;
+      } else {
+        // Section itself is too large — split by lines
+        const lines = section.split("\n");
+        currentPage = "";
+        for (const line of lines) {
+          if (currentPage.length + line.length + 1 > maxCharsPerPage) {
+            if (currentPage.trim()) {
+              pages.push(currentPage.trim());
+            }
+            currentPage = line + "\n";
+          } else {
+            currentPage += line + "\n";
+          }
+        }
+      }
+    }
+  }
+
+  if (currentPage.trim()) {
+    pages.push(currentPage.trim());
+  }
+
+  return pages.length > 0 ? pages : [rawDiff.slice(0, maxCharsPerPage)];
+}
+
+/**
+ * Split raw diff into per-file sections.
+ * Each entry maps a file path to its diff content (including the header).
+ */
+export function splitDiffByFile(rawDiff: string): Map<string, string> {
+  const result = new Map<string, string>();
+  const fileSections = rawDiff.split(/(?=^diff --git )/m);
+
+  for (const section of fileSections) {
+    if (!section.trim()) continue;
+
+    // Extract file path from "diff --git a/path b/path"
+    const headerMatch = section.match(/^diff --git a\/(.+?) b\/(.+)/m);
+    if (headerMatch) {
+      const filePath = headerMatch[2];
+      result.set(filePath, section.trim());
+    }
+  }
+
+  return result;
+}

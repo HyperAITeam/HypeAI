@@ -40,6 +40,7 @@ import helpCommand from "./commands/help.js";
 import myidCommand from "./commands/myid.js";
 import taskCommand from "./commands/task.js";
 import diffCommand from "./commands/diff.js";
+import reviewCommand from "./commands/review.js";
 
 // ── Global error handlers (prevent silent crash in exe) ─────────────
 process.on("unhandledRejection", (reason) => {
@@ -223,6 +224,7 @@ const allCommands: PrefixCommand[] = [
   myidCommand,
   taskCommand,
   diffCommand,
+  reviewCommand,
 ];
 
 function loadCommands(client: BotClient): void {

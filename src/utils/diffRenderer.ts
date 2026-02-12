@@ -7,6 +7,8 @@ export interface RenderOptions {
   maxLines?: number;
   outputFormat?: "side-by-side" | "line-by-line";
   fontSize?: number;
+  /** Mobile-optimized rendering: 480px width, larger font, no line numbers */
+  mobile?: boolean;
 }
 
 // Singleton browser instance for performance
@@ -71,25 +73,25 @@ export async function diffToImage(
   diffString: string,
   options: RenderOptions = {},
 ): Promise<Buffer> {
-  const {
-    theme = "dark",
-    outputFormat = "line-by-line",
-    fontSize = 12,
-    maxLines = 100,
-  } = options;
+  const mobile = options.mobile ?? false;
+  const theme = options.theme ?? "dark";
+  const outputFormat = mobile ? "line-by-line" : (options.outputFormat ?? "line-by-line");
+  const fontSize = mobile ? 14 : (options.fontSize ?? 12);
+  const maxLines = mobile ? 50 : (options.maxLines ?? 100);
+  const maxWidth = mobile ? 480 : 1200;
 
   // Truncate diff if too long
   const truncatedDiff = truncateDiff(diffString, maxLines);
 
   // Generate HTML from diff
   const diffHtml = diff2html(truncatedDiff, {
-    drawFileList: true,
+    drawFileList: !mobile,
     matching: "lines",
     outputFormat: outputFormat === "side-by-side" ? "side-by-side" : "line-by-line",
   });
 
   // Create full HTML page with styling
-  const fullHtml = createHtmlPage(diffHtml, theme, fontSize);
+  const fullHtml = createHtmlPage(diffHtml, theme, fontSize, mobile);
 
   // Render to image
   const browser = await getBrowser();
@@ -107,7 +109,7 @@ export async function diffToImage(
     }
 
     // Set viewport to content size (with max width)
-    const width = Math.min(Math.ceil(boundingBox.width) + 40, 1200);
+    const width = Math.min(Math.ceil(boundingBox.width) + 40, maxWidth);
     const height = Math.min(Math.ceil(boundingBox.height) + 40, 4000);
 
     await page.setViewport({ width, height });
@@ -148,7 +150,12 @@ function truncateDiff(diff: string, maxLines: number): string {
 /**
  * Create full HTML page with diff2html styling
  */
-function createHtmlPage(diffHtml: string, theme: "light" | "dark", fontSize: number): string {
+function createHtmlPage(
+  diffHtml: string,
+  theme: "light" | "dark",
+  fontSize: number,
+  mobile: boolean = false,
+): string {
   const isDark = theme === "dark";
 
   const colors = isDark
@@ -177,10 +184,58 @@ function createHtmlPage(diffHtml: string, theme: "light" | "dark", fontSize: num
         border: "#e1e4e8",
       };
 
+  // Mobile-specific CSS overrides
+  const mobileStyles = mobile
+    ? `
+    /* Mobile optimizations */
+    body {
+      padding: 8px;
+      line-height: 1.5;
+    }
+
+    .d2h-code-linenumber {
+      display: none !important;
+    }
+
+    .d2h-code-line {
+      padding: 3px 6px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .d2h-code-line-ctn {
+      padding: 3px 6px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+    }
+
+    .d2h-file-header {
+      padding: 6px 8px;
+      font-size: ${fontSize - 1}px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .d2h-file-wrapper {
+      margin-bottom: 10px;
+    }
+
+    .d2h-file-diff {
+      overflow-x: hidden;
+    }
+
+    .d2h-file-list-wrapper {
+      display: none;
+    }
+    `
+    : "";
+
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
+  ${mobile ? '<meta name="viewport" content="width=480">' : ""}
   <style>
     * {
       box-sizing: border-box;
@@ -318,6 +373,8 @@ function createHtmlPage(diffHtml: string, theme: "light" | "dark", fontSize: num
       margin-top: 8px;
       font-style: italic;
     }
+
+    ${mobileStyles}
   </style>
 </head>
 <body>

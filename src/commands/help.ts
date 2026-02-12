@@ -57,6 +57,8 @@ const helpCommand: PrefixCommand = {
             `\`${p}diff\` — Show git diff as image (aliases: \`${p}d\`, \`${p}changes\`)`,
             `\`${p}diff --staged\` — Show staged changes only`,
             `\`${p}diff <file>\` — Show diff for specific file`,
+            `\`${p}review\` — Interactive code review with AI summary (aliases: \`${p}r\`, \`${p}rv\`)`,
+            `\`${p}review --staged\` — Review staged changes only`,
           ].join("\n"),
           inline: false,
         },

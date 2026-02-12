@@ -1,4 +1,4 @@
-import { AttachmentBuilder, EmbedBuilder } from "discord.js";
+import { AttachmentBuilder, EmbedBuilder, type TextChannel } from "discord.js";
 import type { PrefixCommand, CommandContext } from "../types.js";
 import { isAllowedUser } from "../utils/security.js";
 import { withTyping } from "../utils/typing.js";
@@ -7,6 +7,7 @@ import {
   getGitDiff,
   filterSensitiveFiles,
   filterSensitiveDiff,
+  splitDiffIntoPages,
   type DiffOptions,
 } from "../utils/gitDiff.js";
 import { diffToImage, createTextDiffSummary } from "../utils/diffRenderer.js";
@@ -129,7 +130,7 @@ const diffCommand: PrefixCommand = {
           files: [attachment],
         });
       } catch (renderError) {
-        // Fallback to text if image rendering fails
+        // Fallback: text-based diff (mobile-friendly)
         console.error("[Diff] Image render failed:", renderError);
 
         const textSummary = createTextDiffSummary(
@@ -138,15 +139,26 @@ const diffCommand: PrefixCommand = {
           diffResult.totalRemoved,
         );
 
-        // Attach raw diff as file
-        const diffFile = new AttachmentBuilder(Buffer.from(safeDiff, "utf-8"), {
-          name: "changes.diff",
-        });
-
-        await ctx.message.reply({
-          content: textSummary,
-          files: [diffFile],
-        });
+        // Fallback 1: Short diff → inline diff code block (no download needed)
+        const codeBlock = `\`\`\`diff\n${safeDiff}\n\`\`\``;
+        if (codeBlock.length <= 2000) {
+          await ctx.message.reply({ content: textSummary + "\n" + codeBlock });
+        } else {
+          // Fallback 2: Split into pages as diff code blocks
+          const pages = splitDiffIntoPages(safeDiff, 1800);
+          if (pages.length <= 5) {
+            await ctx.message.reply(textSummary);
+            for (const page of pages) {
+              await (ctx.message.channel as TextChannel).send(`\`\`\`diff\n${page}\n\`\`\``);
+            }
+          } else {
+            // Fallback 3: Too long → .txt file attachment (last resort)
+            const file = new AttachmentBuilder(Buffer.from(safeDiff, "utf-8"), {
+              name: "changes.txt",
+            });
+            await ctx.message.reply({ content: textSummary, files: [file] });
+          }
+        }
       }
     });
   },
