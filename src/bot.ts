@@ -15,6 +15,7 @@ import {
   APPLICATION_ID, SLASH_COMMAND_GUILD_ID,
   LINE_CHANNEL_ACCESS_TOKEN, LINE_CHANNEL_SECRET,
 } from "./config.js";
+import { startSetupServer, envExists } from "./setup/setupServer.js";
 import { LineBotServer } from "./lineBot.js";
 import type { BotClient, PrefixCommand, CommandContext } from "./types.js";
 import type { ISessionManager } from "./sessions/types.js";
@@ -399,7 +400,35 @@ export function createSession(cliName: string, cwd: string): ISessionManager {
 // ── Main ─────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  await setupEnv();
+  let cliName: string;
+  let workingDir: string;
+
+  // Check if .env exists - if not, open web setup page
+  if (!envExists()) {
+    console.log();
+    console.log("  .env 파일이 없습니다. 웹 설정 페이지를 엽니다...");
+
+    try {
+      const setupResult = await startSetupServer(5000);
+      reloadConfig();
+      cliName = setupResult.cliName;
+      workingDir = setupResult.workingDir || process.cwd();
+    } catch (err: any) {
+      // Fallback to terminal setup if web setup fails
+      console.log();
+      console.log("  웹 설정을 사용할 수 없습니다. 터미널 설정으로 전환합니다...");
+      console.log();
+      await setupEnv();
+      const result = await startupSetup();
+      cliName = result.cliName;
+      workingDir = result.workingDir;
+    }
+  } else {
+    // .env exists, use terminal setup for CLI/working dir selection
+    const result = await startupSetup();
+    cliName = result.cliName;
+    workingDir = result.workingDir;
+  }
 
   const hasDiscord = !!DISCORD_BOT_TOKEN;
   const hasLine = !!(LINE_CHANNEL_ACCESS_TOKEN && LINE_CHANNEL_SECRET);
@@ -416,7 +445,15 @@ async function main(): Promise<void> {
     console.warn();
   }
 
-  const { cliName, workingDir } = await startupSetup();
+  // Ensure rules file exists
+  workingDir = path.resolve(workingDir || process.cwd());
+  ensureRulesMd(cliName, workingDir);
+
+  console.log();
+  console.log("=".repeat(48));
+  console.log(`  ${CLI_TOOLS[cliName].name}  @  ${workingDir}`);
+  console.log("=".repeat(48));
+  console.log();
 
   // Initialize audit logger
   if (AUDIT_LOG_ENABLED) {
