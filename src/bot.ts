@@ -68,6 +68,15 @@ function ask(question: string): Promise<string> {
 
 // ── First-run .env setup ─────────────────────────────────────────────
 
+// Validation helpers
+function isValidDiscordId(id: string): boolean {
+  return /^\d{17,19}$/.test(id);
+}
+
+function isValidLineUserId(id: string): boolean {
+  return /^U[a-f0-9]{32}$/i.test(id);
+}
+
 async function setupEnv(): Promise<void> {
   const envPath = path.join(process.cwd(), ".env");
   if (fs.existsSync(envPath)) return;
@@ -80,35 +89,137 @@ async function setupEnv(): Promise<void> {
   console.log("  .env 파일이 없습니다. 필수 정보를 입력해주세요.");
   console.log();
 
-  // 1) Discord 봇 토큰
-  let token: string;
+  // 1) Platform selection
+  console.log("  [1] 사용할 플랫폼을 선택하세요:");
+  console.log();
+  console.log("      1) Discord만");
+  console.log("      2) LINE만");
+  console.log("      3) Discord + LINE 둘 다");
+  console.log();
+
+  let platformChoice: number;
   while (true) {
-    token = await ask("  [1/2] Discord 봇 토큰: ");
-    if (token) break;
-    console.log("  봇 토큰은 필수입니다. 다시 입력해주세요.");
+    const raw = await ask("  선택 [1-3] (기본: 1): ");
+    if (raw === "") {
+      platformChoice = 1;
+      break;
+    }
+    const n = parseInt(raw, 10);
+    if (n >= 1 && n <= 3) {
+      platformChoice = n;
+      break;
+    }
+    console.log("  잘못된 선택입니다. 1, 2, 3 중 하나를 입력해주세요.");
   }
 
-  // 2) Discord 유저 ID
-  let userId: string;
-  while (true) {
-    userId = await ask("  [2/2] Discord 유저 ID: ");
-    if (userId) break;
-    console.log("  유저 ID는 필수입니다. 다시 입력해주세요.");
+  const useDiscord = platformChoice === 1 || platformChoice === 3;
+  const useLine = platformChoice === 2 || platformChoice === 3;
+
+  const platformNames = [];
+  if (useDiscord) platformNames.push("Discord");
+  if (useLine) platformNames.push("LINE");
+  console.log(`  -> ${platformNames.join(" + ")} 선택됨`);
+  console.log();
+
+  // Build env content
+  const envLines: string[] = [];
+
+  // Discord settings
+  if (useDiscord) {
+    console.log("  ─── Discord 설정 ───");
+    console.log();
+
+    // Discord bot token
+    let discordToken: string;
+    while (true) {
+      discordToken = await ask("  Discord 봇 토큰: ");
+      if (discordToken) break;
+      console.log("  봇 토큰은 필수입니다. 다시 입력해주세요.");
+    }
+
+    // Discord user ID
+    let discordUserId: string;
+    while (true) {
+      discordUserId = await ask("  Discord 유저 ID (17-19자리 숫자): ");
+      if (isValidDiscordId(discordUserId)) break;
+      console.log("  유효하지 않은 ID입니다. 17-19자리 숫자를 입력해주세요.");
+    }
+
+    envLines.push("# Discord 설정");
+    envLines.push(`DISCORD_BOT_TOKEN=${discordToken}`);
+    envLines.push(`ALLOWED_USER_IDS=${discordUserId}`);
+    envLines.push("");
+    console.log();
   }
 
-  const envContent = [
-    `DISCORD_BOT_TOKEN=${token}`,
-    `ALLOWED_USER_IDS=${userId}`,
-    `COMMAND_PREFIX=!`,
-    `COMMAND_TIMEOUT=30`,
-    `AI_CLI_TIMEOUT=300`,
-  ].join("\n") + "\n";
+  // LINE settings
+  if (useLine) {
+    console.log("  ─── LINE 설정 ───");
+    console.log();
+    console.log("  LINE Developers Console에서 토큰과 시크릿을 복사하세요.");
+    console.log("  https://developers.line.biz/console/");
+    console.log();
 
+    // LINE Channel Access Token
+    let lineToken: string;
+    while (true) {
+      lineToken = await ask("  LINE Channel Access Token: ");
+      if (lineToken) break;
+      console.log("  Access Token은 필수입니다. 다시 입력해주세요.");
+    }
+
+    // LINE Channel Secret
+    let lineSecret: string;
+    while (true) {
+      lineSecret = await ask("  LINE Channel Secret: ");
+      if (lineSecret) break;
+      console.log("  Channel Secret은 필수입니다. 다시 입력해주세요.");
+    }
+
+    // LINE User ID
+    let lineUserId: string;
+    while (true) {
+      lineUserId = await ask("  LINE 유저 ID (U로 시작하는 33자): ");
+      if (isValidLineUserId(lineUserId)) break;
+      console.log("  유효하지 않은 LINE ID입니다. U로 시작하는 33자 문자열을 입력해주세요.");
+    }
+
+    // LINE Webhook Port
+    const portRaw = await ask("  LINE 웹훅 포트 (기본: 3000): ");
+    const linePort = portRaw || "3000";
+
+    envLines.push("# LINE 설정");
+    envLines.push(`LINE_CHANNEL_ACCESS_TOKEN=${lineToken}`);
+    envLines.push(`LINE_CHANNEL_SECRET=${lineSecret}`);
+    envLines.push(`ALLOWED_LINE_USER_IDS=${lineUserId}`);
+    envLines.push(`LINE_WEBHOOK_PORT=${linePort}`);
+    envLines.push("");
+
+    console.log();
+    console.log("  ─── LINE 웹훅 안내 ───");
+    console.log();
+    console.log("  LINE 봇은 웹훅 URL이 필요합니다.");
+    console.log("  로컬 테스트: Cloudflare Tunnel 사용 (무료)");
+    console.log();
+    console.log("    1. 설치: winget install cloudflare.cloudflared");
+    console.log(`    2. 실행: cloudflared tunnel --url http://localhost:${linePort}`);
+    console.log("    3. 표시된 URL + /webhook 을 LINE Developers에 등록");
+    console.log();
+  }
+
+  // Common settings
+  envLines.push("# 공통 설정");
+  envLines.push("COMMAND_PREFIX=!");
+  envLines.push("COMMAND_TIMEOUT=30");
+  envLines.push("AI_CLI_TIMEOUT=300");
+
+  const envContent = envLines.join("\n") + "\n";
   fs.writeFileSync(envPath, envContent, "utf-8");
   reloadConfig();
 
-  console.log();
+  console.log("=".repeat(48));
   console.log("  .env 파일이 생성되었습니다!");
+  console.log("=".repeat(48));
   console.log();
 }
 
