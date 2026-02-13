@@ -214,6 +214,71 @@
       color: #FFA500;
     }
 
+    .create-bot-banner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .create-bot-banner:hover {
+      transform: translateY(-2px);
+    }
+
+    .discord-banner {
+      background: linear-gradient(135deg, rgba(88, 101, 242, 0.2), rgba(88, 101, 242, 0.1));
+      border: 1px solid rgba(88, 101, 242, 0.4);
+    }
+
+    .discord-banner:hover {
+      background: linear-gradient(135deg, rgba(88, 101, 242, 0.3), rgba(88, 101, 242, 0.15));
+      box-shadow: 0 8px 25px rgba(88, 101, 242, 0.25);
+    }
+
+    .line-banner {
+      background: linear-gradient(135deg, rgba(6, 199, 85, 0.2), rgba(6, 199, 85, 0.1));
+      border: 1px solid rgba(6, 199, 85, 0.4);
+    }
+
+    .line-banner:hover {
+      background: linear-gradient(135deg, rgba(6, 199, 85, 0.3), rgba(6, 199, 85, 0.15));
+      box-shadow: 0 8px 25px rgba(6, 199, 85, 0.25);
+    }
+
+    .banner-icon {
+      font-size: 2rem;
+      flex-shrink: 0;
+    }
+
+    .banner-text {
+      flex: 1;
+    }
+
+    .banner-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 2px;
+    }
+
+    .banner-subtitle {
+      font-size: 0.8rem;
+      color: #a1a1aa;
+    }
+
+    .banner-arrow {
+      font-size: 1.2rem;
+      color: #a1a1aa;
+      transition: transform 0.3s;
+    }
+
+    .create-bot-banner:hover .banner-arrow {
+      transform: translateX(4px);
+    }
+
     .platform-content {
       display: none;
       animation: fadeIn 0.3s ease;
@@ -365,24 +430,30 @@
         </div>
 
         <div class="platform-content show" id="discordContent">
+          <!-- No bot yet? Create one! -->
+          <div class="create-bot-banner discord-banner" onclick="window.open('https://discord.com/developers/applications', '_blank')">
+            <div class="banner-icon">&#129302;</div>
+            <div class="banner-text">
+              <div class="banner-title">Discord 봇이 없으신가요?</div>
+              <div class="banner-subtitle">클릭하여 Discord Developer Portal에서 만들기</div>
+            </div>
+            <div class="banner-arrow">&#10132;</div>
+          </div>
+
           <div class="form-group">
             <label for="discordToken">봇 토큰 *</label>
             <input type="password" id="discordToken" name="discordToken"
                    placeholder="MTIzNDU2Nzg5..." autocomplete="off">
-            <div class="input-hint">Discord Developer Portal에서 복사</div>
+            <div class="input-hint">Discord Developer Portal > Bot > Reset Token</div>
           </div>
 
           <div class="form-group">
             <label for="discordUserId">유저 ID *</label>
             <input type="text" id="discordUserId" name="discordUserId"
                    placeholder="123456789012345678" autocomplete="off">
-            <div class="input-hint">17-19자리 숫자 (개발자 모드에서 복사)</div>
+            <div class="input-hint">Discord 설정 > 고급 > 개발자 모드 ON > 프로필 우클릭 > ID 복사</div>
             <div class="input-error" id="discordUserIdError"></div>
           </div>
-
-          <a href="https://discord.com/developers/applications" target="_blank" class="help-link">
-            &#10132; Discord 봇 만들기 가이드
-          </a>
         </div>
       </div>
 
@@ -397,6 +468,16 @@
         </div>
 
         <div class="platform-content show" id="lineContent">
+          <!-- No LINE bot yet? Create one! -->
+          <div class="create-bot-banner line-banner" onclick="window.open('https://manager.line.biz/', '_blank')">
+            <div class="banner-icon">&#128172;</div>
+            <div class="banner-text">
+              <div class="banner-title">LINE 봇이 없으신가요?</div>
+              <div class="banner-subtitle">클릭하여 LINE Official Account 만들기</div>
+            </div>
+            <div class="banner-arrow">&#10132;</div>
+          </div>
+
           <div class="form-group">
             <label for="lineToken">Channel Access Token *</label>
             <input type="password" id="lineToken" name="lineToken"
