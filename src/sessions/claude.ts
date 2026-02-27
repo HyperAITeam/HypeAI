@@ -91,6 +91,28 @@ function basename(filePath: string): string {
   return parts[parts.length - 1] ?? filePath;
 }
 
+/**
+ * 작업 디렉토리의 .mcp.json 파일에서 MCP 서버 설정을 읽어 반환.
+ * 파일이 없거나 파싱 실패 시 undefined 반환.
+ */
+function loadMcpServers(cwd: string): Record<string, unknown> | undefined {
+  const mcpPath = path.join(cwd, ".mcp.json");
+  try {
+    if (!fs.existsSync(mcpPath)) return undefined;
+    const raw = fs.readFileSync(mcpPath, "utf-8");
+    const parsed = JSON.parse(raw);
+    const servers = parsed.mcpServers ?? parsed;
+    if (typeof servers !== "object" || servers === null) return undefined;
+    const names = Object.keys(servers);
+    if (names.length === 0) return undefined;
+    console.log(`  [MCP] Loaded ${names.length} server(s) from .mcp.json: ${names.join(", ")}`);
+    return servers;
+  } catch {
+    console.error("  [MCP] Failed to parse .mcp.json");
+    return undefined;
+  }
+}
+
 export class ClaudeSessionManager implements ISessionManager {
   private tool: CliTool;
   private cwd: string;
@@ -173,6 +195,7 @@ export class ClaudeSessionManager implements ISessionManager {
   ): Promise<string> {
     const cliPath = resolveClaudeCodePath();
     const nodePath = await resolveNodeExecutable();
+    const mcpServers = loadMcpServers(this.cwd);
     console.log(`  [Claude] cliPath: ${cliPath ?? "(SDK default)"}`);
     console.log(`  [Claude] nodePath: ${nodePath}`);
     console.log(`  [Claude] cwd: ${this.cwd}`);
@@ -184,6 +207,7 @@ export class ClaudeSessionManager implements ISessionManager {
       abortController: this.abortController,
       executable: nodePath,
       ...(cliPath && { pathToClaudeCodeExecutable: cliPath }),
+      ...(mcpServers && { mcpServers }),
       stderr: (data: string) => console.error("[Claude stderr]", data),
       // pkg exe 환경에서 signal 옵션이 제대로 전달되지 않을 수 있으므로
       // 직접 spawn해서 abort는 수동으로 처리한다.
