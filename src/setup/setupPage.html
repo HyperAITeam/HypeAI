@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI CLI Gateway Bot - Setup</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      color: #e4e4e7;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #FFDD00, #FFA500);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      color: #a1a1aa;
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+    }
+
+    .card-icon.discord {
+      background: linear-gradient(135deg, #5865F2, #4752C4);
+    }
+
+    .card-icon.line {
+      background: linear-gradient(135deg, #06C755, #05A847);
+    }
+
+    .card-icon.settings {
+      background: linear-gradient(135deg, #6366F1, #4F46E5);
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .card-subtitle {
+      font-size: 0.8rem;
+      color: #a1a1aa;
+    }
+
+    .platform-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      margin-bottom: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .platform-toggle:hover {
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .platform-toggle.active {
+      border: 1px solid rgba(255, 221, 0, 0.3);
+      background: rgba(255, 221, 0, 0.05);
+    }
+
+    .toggle-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .toggle-switch {
+      width: 48px;
+      height: 26px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 13px;
+      position: relative;
+      transition: all 0.3s;
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      width: 22px;
+      height: 22px;
+      background: white;
+      border-radius: 50%;
+      top: 2px;
+      left: 2px;
+      transition: all 0.3s;
+    }
+
+    .platform-toggle.active .toggle-switch {
+      background: linear-gradient(135deg, #FFDD00, #FFA500);
+    }
+
+    .platform-toggle.active .toggle-switch::after {
+      left: 24px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: #a1a1aa;
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      color: #e4e4e7;
+      font-size: 0.95rem;
+      transition: all 0.2s;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #FFDD00;
+      box-shadow: 0 0 0 3px rgba(255, 221, 0, 0.1);
+    }
+
+    input::placeholder {
+      color: #52525b;
+    }
+
+    input.error {
+      border-color: #EF4444;
+    }
+
+    input.success {
+      border-color: #22C55E;
+    }
+
+    .input-hint {
+      font-size: 0.75rem;
+      color: #71717a;
+      margin-top: 4px;
+    }
+
+    .input-error {
+      font-size: 0.75rem;
+      color: #EF4444;
+      margin-top: 4px;
+    }
+
+    .help-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #FFDD00;
+      text-decoration: none;
+      font-size: 0.85rem;
+      margin-top: 12px;
+      transition: all 0.2s;
+    }
+
+    .help-link:hover {
+      color: #FFA500;
+    }
+
+    .create-bot-banner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .create-bot-banner:hover {
+      transform: translateY(-2px);
+    }
+
+    .discord-banner {
+      background: linear-gradient(135deg, rgba(88, 101, 242, 0.2), rgba(88, 101, 242, 0.1));
+      border: 1px solid rgba(88, 101, 242, 0.4);
+    }
+
+    .discord-banner:hover {
+      background: linear-gradient(135deg, rgba(88, 101, 242, 0.3), rgba(88, 101, 242, 0.15));
+      box-shadow: 0 8px 25px rgba(88, 101, 242, 0.25);
+    }
+
+    .line-banner {
+      background: linear-gradient(135deg, rgba(6, 199, 85, 0.2), rgba(6, 199, 85, 0.1));
+      border: 1px solid rgba(6, 199, 85, 0.4);
+    }
+
+    .line-banner:hover {
+      background: linear-gradient(135deg, rgba(6, 199, 85, 0.3), rgba(6, 199, 85, 0.15));
+      box-shadow: 0 8px 25px rgba(6, 199, 85, 0.25);
+    }
+
+    .banner-icon {
+      font-size: 2rem;
+      flex-shrink: 0;
+    }
+
+    .banner-text {
+      flex: 1;
+    }
+
+    .banner-title {
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 2px;
+    }
+
+    .banner-subtitle {
+      font-size: 0.8rem;
+      color: #a1a1aa;
+    }
+
+    .banner-arrow {
+      font-size: 1.2rem;
+      color: #a1a1aa;
+      transition: transform 0.3s;
+    }
+
+    .create-bot-banner:hover .banner-arrow {
+      transform: translateX(4px);
+    }
+
+    .platform-content {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .platform-content.show {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .info-box {
+      background: rgba(99, 102, 241, 0.1);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-top: 16px;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    .info-box.warning {
+      background: rgba(245, 158, 11, 0.1);
+      border-color: rgba(245, 158, 11, 0.3);
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #FFDD00, #FFA500);
+      border: none;
+      border-radius: 12px;
+      color: #1a1a2e;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 10px;
+    }
+
+    .submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(255, 221, 0, 0.3);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .status-message {
+      text-align: center;
+      padding: 16px;
+      border-radius: 10px;
+      margin-top: 16px;
+      display: none;
+    }
+
+    .status-message.success {
+      display: block;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      color: #22C55E;
+    }
+
+    .status-message.error {
+      display: block;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #EF4444;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #FFDD00;
+      animation: spin 1s linear infinite;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 30px;
+      color: #52525b;
+      font-size: 0.8rem;
+    }
+
+    footer a {
+      color: #FFDD00;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>AI CLI Gateway Bot</h1>
+      <p class="subtitle">Discord / LINE에서 AI CLI 도구를 원격 제어하세요</p>
+    </header>
+
+    <form id="setupForm">
+      <!-- Platform Selection -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon settings">&#9881;</div>
+          <div>
+            <div class="card-title">플랫폼 선택</div>
+            <div class="card-subtitle">사용할 메신저를 선택하세요</div>
+          </div>
+        </div>
+
+        <div class="platform-toggle active" id="discordToggle" onclick="togglePlatform('discord')">
+          <div class="toggle-left">
+            <span style="font-size: 1.3rem;">&#128172;</span>
+            <span>Discord</span>
+          </div>
+          <div class="toggle-switch"></div>
+        </div>
+
+        <div class="platform-toggle" id="lineToggle" onclick="togglePlatform('line')">
+          <div class="toggle-left">
+            <span style="font-size: 1.3rem;">&#128172;</span>
+            <span>LINE</span>
+          </div>
+          <div class="toggle-switch"></div>
+        </div>
+      </div>
+
+      <!-- Discord Settings -->
+      <div class="card" id="discordCard">
+        <div class="card-header">
+          <div class="card-icon discord">&#128172;</div>
+          <div>
+            <div class="card-title">Discord 설정</div>
+            <div class="card-subtitle">Discord 봇 정보를 입력하세요</div>
+          </div>
+        </div>
+
+        <div class="platform-content show" id="discordContent">
+          <!-- No bot yet? Create one! -->
+          <div class="create-bot-banner discord-banner" onclick="window.open('https://discord.com/developers/applications', '_blank')">
+            <div class="banner-icon">&#129302;</div>
+            <div class="banner-text">
+              <div class="banner-title">Discord 봇이 없으신가요?</div>
+              <div class="banner-subtitle">클릭하여 Discord Developer Portal에서 만들기</div>
+            </div>
+            <div class="banner-arrow">&#10132;</div>
+          </div>
+
+          <div class="form-group">
+            <label for="discordToken">봇 토큰 *</label>
+            <input type="password" id="discordToken" name="discordToken"
+                   placeholder="MTIzNDU2Nzg5..." autocomplete="off">
+            <div class="input-hint">Discord Developer Portal > Bot > Reset Token</div>
+          </div>
+
+          <div class="form-group">
+            <label for="discordUserId">유저 ID *</label>
+            <input type="text" id="discordUserId" name="discordUserId"
+                   placeholder="123456789012345678" autocomplete="off">
+            <div class="input-hint">Discord 설정 > 고급 > 개발자 모드 ON > 프로필 우클릭 > ID 복사</div>
+            <div class="input-error" id="discordUserIdError"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LINE Settings -->
+      <div class="card" id="lineCard" style="display: none;">
+        <div class="card-header">
+          <div class="card-icon line">&#128172;</div>
+          <div>
+            <div class="card-title">LINE 설정</div>
+            <div class="card-subtitle">LINE Messaging API 정보를 입력하세요</div>
+          </div>
+        </div>
+
+        <div class="platform-content show" id="lineContent">
+          <!-- No LINE bot yet? Create one! -->
+          <div class="create-bot-banner line-banner" onclick="window.open('https://manager.line.biz/', '_blank')">
+            <div class="banner-icon">&#128172;</div>
+            <div class="banner-text">
+              <div class="banner-title">LINE 봇이 없으신가요?</div>
+              <div class="banner-subtitle">클릭하여 LINE Official Account 만들기</div>
+            </div>
+            <div class="banner-arrow">&#10132;</div>
+          </div>
+
+          <div class="form-group">
+            <label for="lineToken">Channel Access Token *</label>
+            <input type="password" id="lineToken" name="lineToken"
+                   placeholder="xxxxxxxxxx..." autocomplete="off">
+          </div>
+
+          <div class="form-group">
+            <label for="lineSecret">Channel Secret *</label>
+            <input type="password" id="lineSecret" name="lineSecret"
+                   placeholder="xxxxxxxxxx..." autocomplete="off">
+          </div>
+
+          <div class="form-group">
+            <label for="lineUserId">유저 ID *</label>
+            <input type="text" id="lineUserId" name="lineUserId"
+                   placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+            <div class="input-hint">U로 시작하는 33자 문자열</div>
+            <div class="input-error" id="lineUserIdError"></div>
+          </div>
+
+          <div class="form-group">
+            <label for="linePort">웹훅 포트</label>
+            <input type="text" id="linePort" name="linePort"
+                   placeholder="3000" value="3000">
+          </div>
+
+          <div class="info-box warning">
+            <strong>&#9888; LINE 웹훅 설정 필요</strong><br>
+            LINE 봇은 외부 접속 URL이 필요합니다.<br>
+            Cloudflare Tunnel 사용: <code>cloudflared tunnel --url http://localhost:3000</code>
+          </div>
+
+          <a href="https://developers.line.biz/console/" target="_blank" class="help-link">
+            &#10132; LINE Developers Console
+          </a>
+        </div>
+      </div>
+
+      <!-- CLI Selection -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon settings">&#129302;</div>
+          <div>
+            <div class="card-title">AI CLI 도구</div>
+            <div class="card-subtitle">사용할 AI CLI를 선택하세요</div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <select id="cliTool" name="cliTool" style="width: 100%; padding: 12px 16px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #e4e4e7; font-size: 0.95rem;">
+            <option value="claude">Claude Code (Agent SDK)</option>
+            <option value="gemini">Gemini CLI</option>
+            <option value="opencode">OpenCode</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="workingDir">작업 디렉토리</label>
+          <input type="text" id="workingDir" name="workingDir"
+                 placeholder="C:\MyProject">
+          <div class="input-hint">AI가 작업할 폴더 경로 (비워두면 현재 폴더)</div>
+        </div>
+      </div>
+
+      <button type="submit" class="submit-btn" id="submitBtn">
+        저장하고 봇 시작하기
+      </button>
+
+      <div class="status-message" id="statusMessage"></div>
+    </form>
+
+    <footer>
+      <a href="https://github.com/HyperAITeam/HypeAI" target="_blank">HypeAI</a> &copy; 2024
+    </footer>
+  </div>
+
+  <script>
+    const state = {
+      discord: true,
+      line: false
+    };
+
+    function togglePlatform(platform) {
+      state[platform] = !state[platform];
+
+      // At least one platform must be selected
+      if (!state.discord && !state.line) {
+        state[platform] = true;
+        return;
+      }
+
+      updateUI();
+    }
+
+    function updateUI() {
+      // Toggle buttons
+      document.getElementById('discordToggle').classList.toggle('active', state.discord);
+      document.getElementById('lineToggle').classList.toggle('active', state.line);
+
+      // Cards visibility
+      document.getElementById('discordCard').style.display = state.discord ? 'block' : 'none';
+      document.getElementById('lineCard').style.display = state.line ? 'block' : 'none';
+    }
+
+    // Validation
+    function isValidDiscordId(id) {
+      return /^\d{17,19}$/.test(id);
+    }
+
+    function isValidLineUserId(id) {
+      return /^U[a-f0-9]{32}$/i.test(id);
+    }
+
+    document.getElementById('discordUserId').addEventListener('input', (e) => {
+      const error = document.getElementById('discordUserIdError');
+      if (e.target.value && !isValidDiscordId(e.target.value)) {
+        e.target.classList.add('error');
+        e.target.classList.remove('success');
+        error.textContent = '17-19자리 숫자를 입력해주세요';
+      } else if (e.target.value) {
+        e.target.classList.remove('error');
+        e.target.classList.add('success');
+        error.textContent = '';
+      } else {
+        e.target.classList.remove('error', 'success');
+        error.textContent = '';
+      }
+    });
+
+    document.getElementById('lineUserId').addEventListener('input', (e) => {
+      const error = document.getElementById('lineUserIdError');
+      if (e.target.value && !isValidLineUserId(e.target.value)) {
+        e.target.classList.add('error');
+        e.target.classList.remove('success');
+        error.textContent = 'U로 시작하는 33자 문자열을 입력해주세요';
+      } else if (e.target.value) {
+        e.target.classList.remove('error');
+        e.target.classList.add('success');
+        error.textContent = '';
+      } else {
+        e.target.classList.remove('error', 'success');
+        error.textContent = '';
+      }
+    });
+
+    // Form submission
+    document.getElementById('setupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const btn = document.getElementById('submitBtn');
+      const status = document.getElementById('statusMessage');
+
+      // Validate
+      if (state.discord) {
+        const token = document.getElementById('discordToken').value;
+        const userId = document.getElementById('discordUserId').value;
+
+        if (!token || !userId) {
+          status.className = 'status-message error';
+          status.textContent = 'Discord 토큰과 유저 ID를 입력해주세요';
+          return;
+        }
+
+        if (!isValidDiscordId(userId)) {
+          status.className = 'status-message error';
+          status.textContent = 'Discord 유저 ID 형식이 올바르지 않습니다';
+          return;
+        }
+      }
+
+      if (state.line) {
+        const token = document.getElementById('lineToken').value;
+        const secret = document.getElementById('lineSecret').value;
+        const userId = document.getElementById('lineUserId').value;
+
+        if (!token || !secret || !userId) {
+          status.className = 'status-message error';
+          status.textContent = 'LINE 설정을 모두 입력해주세요';
+          return;
+        }
+
+        if (!isValidLineUserId(userId)) {
+          status.className = 'status-message error';
+          status.textContent = 'LINE 유저 ID 형식이 올바르지 않습니다';
+          return;
+        }
+      }
+
+      // Submit
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loading"></span>저장 중...';
+
+      try {
+        const data = {
+          platforms: state,
+          discord: state.discord ? {
+            token: document.getElementById('discordToken').value,
+            userId: document.getElementById('discordUserId').value
+          } : null,
+          line: state.line ? {
+            token: document.getElementById('lineToken').value,
+            secret: document.getElementById('lineSecret').value,
+            userId: document.getElementById('lineUserId').value,
+            port: document.getElementById('linePort').value || '3000'
+          } : null,
+          cli: document.getElementById('cliTool').value,
+          workingDir: document.getElementById('workingDir').value
+        };
+
+        const response = await fetch('/api/setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          status.className = 'status-message success';
+          status.textContent = '설정이 저장되었습니다! 봇을 시작합니다...';
+
+          // Close this page after a delay
+          setTimeout(() => {
+            window.close();
+          }, 2000);
+        } else {
+          throw new Error(result.error || 'Unknown error');
+        }
+      } catch (err) {
+        status.className = 'status-message error';
+        status.textContent = '오류: ' + err.message;
+        btn.disabled = false;
+        btn.textContent = '저장하고 봇 시작하기';
+      }
+    });
+  </script>
+</body>
+</html>
